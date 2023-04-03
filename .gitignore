@@ -1,0 +1,8 @@
+*.mp3
+*.pyl
+*.pyc
+audio.dist\*
+null
+testEnv.derp
+*.zip
+*.wav
