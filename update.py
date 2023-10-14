@@ -5,12 +5,13 @@ import json
 import time
 import sys
 
-for host in pytools.IO.getJson("..\\ambience_py_deffered\\hosts.json")["hosts"]:
+for host in pytools.IO.getJson("hosts.json")["hosts"]:
     print("[" + host + "] Updating host ...")
     os.system("xcopy .\\client.py \\\\" + host + "\\ambience_client /c /y")
     os.system("xcopy .\\vm.py \\\\" + host + "\\ambience_client /c /y")
     os.system("xcopy .\\run.bat \\\\" + host + "\\ambience_client /c /y")
     os.system("xcopy .\\disableanti.ps1 \\\\" + host + "\\ambience_client /c /y")
+    os.system("xcopy .\\badaudio.ps1 \\\\" + host + "\\ambience_client /c /y")
     os.system("xcopy .\\modules\\* \\\\" + host + "\\ambience_client\\modules /c /y")
     os.system("robocopy \".\\sound\\assets\" \"\\\\" + host + "\\ambience_client\\sound\\assets\" /mir /w:1 /r:1 /S")
     try:

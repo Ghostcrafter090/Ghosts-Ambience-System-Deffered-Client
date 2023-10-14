@@ -883,7 +883,7 @@ class cipher:
         if not isBytes:
             decode = base64.standard_b64decode(s.replace("?", "=")).decode("utf-8")
         else:
-            decode = base64.standard_b64decode(s.replace("?", "="))
+            decode = base64.standard_b64decode(s.replace("?", "=").replace(" ", "+"), )
         return decode
 
     def listToString(s):

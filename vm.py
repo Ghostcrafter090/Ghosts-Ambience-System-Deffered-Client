@@ -9,6 +9,10 @@ import urllib.parse
 import json
 import traceback
 import modules.audio as audio
+import random
+import modules.logManager as log
+
+print = log.printLog
 
 class globals:
     instance = False
@@ -28,11 +32,16 @@ class server:
     class con:
         def arp():
             ipsDirty = subprocess.getoutput("arp -a -v").split("\n")
+            try:
+                interfaceBlacklist = pytools.IO.getJson("excludeInterfaces.json")["list"]
+            except:
+                interfaceBlacklist = []
             ips = {}
             for entry in ipsDirty:
                 if entry.find("Interface:") != -1:
                     interface = entry.split("Interface: ")[1].split(" ")[0]
-                    ips[interface] = []
+                    if not interface in interfaceBlacklist:
+                        ips[interface] = []
                 elif entry.find("Internet Address") != -1:
                     pass
                 else:
@@ -40,7 +49,8 @@ class server:
                         entryf = entry.split(" ")
                         while '' in entryf:
                             entryf.remove('')
-                        ips[interface].append(entryf[0])
+                        if not interface in interfaceBlacklist:
+                            ips[interface].append(entryf[0])
                     except:
                         pass
             return ips
@@ -52,12 +62,13 @@ class server:
                 pytools.net.getJsonAPI("http://" + oldSettings["interface"] + ":4507?json=" + urllib.parse.quote(json.dumps({
                     "command": "ping"
                 })), timeout=1)
-                pytools.net.getJsonAPI("http://" + oldSettings["ip"] + ":5597?json=" + urllib.parse.quote(json.dumps({
-                    "command": "ping",
-                    "data": {
-                        "ipAddress": oldSettings["interface"]
-                    }
-                })), timeout=1)
+                if not os.path.exists("wokeUp.derp"):
+                    pytools.net.getJsonAPI("http://" + oldSettings["ip"] + ":5597?json=" + urllib.parse.quote(json.dumps({
+                        "command": "ping",
+                        "data": {
+                            "ipAddress": oldSettings["interface"]
+                        }
+                    })), timeout=1)
                 outIp = [oldSettings["ip"], oldSettings["interface"]]
             except:
                 finished = False
@@ -150,6 +161,10 @@ class vm:
     def handler():
         while not flags.restart:
             try:
+                configure.fixAudioDg()
+            except:
+                pass
+            try:
                 vm.checkStatus()
             except:
                 pass
@@ -157,6 +172,13 @@ class vm:
             
 
 class configure:
+    def fixAudioDg():
+        audioDgSize = float(subprocess.getoutput('tasklist /fi "IMAGENAME eq audiodg.exe" /fo csv').split("\n")[1].split("\",\"")[-1].replace(",", "").replace(" K\"", ""))
+        if audioDgSize > 500000.0:
+            print("Oversized audiodg.exe detected. Resetting...")
+            os.system("taskkill /f /im audiodg.exe")
+            os.system('"C:\Program Files (x86)\VB\Voicemeeter\voicemeeter8.exe" -r')
+    
     class local:
         def getOutputs():
             devices = sd.query_devices()
@@ -194,14 +216,29 @@ class configure:
                             "fireplace": ["VoiceMeeter Aux Input (VB-Audio", "MME"],
                             "window": ["VoiceMeeter VAIO3 Input (VB-Aud", "MME"],
                             "outside": [outFinal[0]["name"], "MME"],
-                            "windown": [outFinal[1]["name"], "MME"],
+                            "porch": [outFinal[1]["name"], "MME"],
                             "generic": [outFinal[2]["name"], "MME"],
                             "light": [outFinal[3]["name"], "MME"]
                         }
             
+            # if soundOutputs:
+            #     try:
+            #         extras = pytools.IO.getJson("extraOutputs.json")["list"]
+            #     except:
+            #         extras = []
+            #     
+            #     if extras != []:
+            #         for extra in extras:
+            #             soundOutputs[extra] = ["", "MME"]
+            #             
+            #     i = 4
+            #     while (i < len(outFinal)) and (i < len(soundOutputs)):
+            #         soundOutputs[extras[i - 4]] = [outFinal[i]["name"], "MME"]
+            #         i = i + 1
+                
             return soundOutputs
         
-        def getInputs():
+        def getInputsOld():
             devices = sd.query_devices()
             out = {}
             outFinal = []
@@ -237,12 +274,96 @@ class configure:
                             "fireplace": ["VoiceMeeter Aux Input (VB-Audio", "MME"],
                             "window": ["VoiceMeeter VAIO3 Input (VB-Aud", "MME"],
                             "outside": [outFinal[0]["name"], "MME"],
-                            "windown": [outFinal[1]["name"], "MME"],
+                            "porch": [outFinal[1]["name"], "MME"],
                             "generic": [outFinal[2]["name"], "MME"],
                             "light": [outFinal[3]["name"], "MME"]
                         }
+                        
+            # if soundInputs:
+                # try:
+                #     extras = pytools.IO.getJson("extraOutputs.json")["list"]
+                # except:
+                #     extras = []
+                # 
+                # if extras != []:
+                #     for extra in extras:
+                #         soundInputs[extra] = ["", "MME"]
+                        
+            for input in soundInputs:
+                i = 0
+                fin = False
+                while i < 100:
+                    try:
+                        if soundInputs[input][0].find("(" + str(i) + "-") != -1:
+                            if configure.local.getOutputs()[input][0].find("(" + str(i) + "-") == -1:
+                                for sortedDevice in outFinal:
+                                    if sortedDevice["name"].find("(" + str(i) + "-") != -1:
+                                        soundInputs[input] = [sortedDevice["name"], "MME"]
+                                        fin = True
+                                        break
+                    except:
+                        pass
+                    if fin:
+                        break
+                    i = i + 1
+                if not fin:
+                     for sortedDevice in outFinal:
+                        if sortedDevice["name"].find("(VB-Audio Virtual") != -1:
+                            soundInputs[input] = [sortedDevice["name"], "MME"]
+                            break
             
             return soundInputs
+        
+        def getInputs():
+            outputs = configure.local.getOutputs()
+            soundInputs = {
+                "clock": ["VoiceMeeter Input (VB-Audio Voi", "MME"],
+                "fireplace": ["VoiceMeeter Aux Input (VB-Audio", "MME"],
+                "window": ["VoiceMeeter VAIO3 Input (VB-Aud", "MME"],
+                "outside": ["", "MME"],
+                "porch": ["", "MME"],
+                "generic": ["", "MME"],
+                "light": ["", "MME"]
+            }
+            
+            # try:
+            #     extras = pytools.IO.getJson("extraOutputs.json")["list"]
+            # except:
+            #     extras = []
+            # 
+            # if extras != []:
+            #     for extra in extras:
+            #         soundInputs[extra] = ["", "MME"]
+            
+            sortedKey = []
+            
+            for output in outputs:
+                input = outputs[output][0].replace("Speakers", "CABLE Output").replace("CABLE Input", "CABLE Output")
+                while len(input) > 31:
+                    input = input[:-1]
+                sortedKey.append(input)
+            
+            soundInputs["outside"] = [sortedKey[3], "MME"]
+            soundInputs["porch"] = [sortedKey[4], "MME"]
+            soundInputs["generic"] = [sortedKey[5], "MME"]
+            soundInputs["light"] = [sortedKey[6], "MME"]
+            
+            i = 0
+            for input in soundInputs:
+                if soundInputs[input][0] == "":
+                    soundInputs[input][0] = sortedKey[i]
+                i = i + 1
+            
+            for input in soundInputs:
+                returnFalse = True
+                print(soundInputs[input])
+                for device in sd.query_devices():
+                    if device["name"] == soundInputs[input][0]:
+                        returnFalse = False
+                if returnFalse:
+                    return False
+                
+            return soundInputs  
         
         def setOutputs(fix=False):
             outputs = configure.local.getOutputs()
@@ -250,8 +371,8 @@ class configure:
             if outputs:
                 if globals.instance.inputs[0].device != configure.local.getInputs()["outside"][0]:
                     globals.instance.set("Strip[0].device.mme", configure.local.getInputs()["outside"][0])
-                if globals.instance.inputs[1].device != configure.local.getInputs()["windown"][0]:
-                    globals.instance.set("Strip[1].device.mme", configure.local.getInputs()["windown"][0])
+                if globals.instance.inputs[1].device != configure.local.getInputs()["porch"][0]:
+                    globals.instance.set("Strip[1].device.mme", configure.local.getInputs()["porch"][0])
                 if globals.instance.inputs[2].device != configure.local.getInputs()["generic"][0]:
                     globals.instance.set("Strip[2].device.mme", configure.local.getInputs()["generic"][0])
                 if globals.instance.inputs[3].device != configure.local.getInputs()["light"][0]:
@@ -298,11 +419,22 @@ class configure:
                 vm.changed = False
     
     class vban:
-        clientsOld = []
+        clientsOld = [False, False]
         
         def getDaisyChain():
             clients = server.grabOtherComputers()["hosts"]
-            sortedClients = sorted(clients, key = lambda s: sum(map(ord, s[1])), reverse=False)
+            if "0.0.0.0" in clients:
+                clients.remove("0.0.0.0")
+            if "192.168.2.40" in clients:
+                clients.remove("192.168.2.40")
+            permaClients = pytools.IO.getJson(".\\permaclients.json")
+            if permaClients["primary"] in clients:
+                clients.remove(permaClients["primary"])
+                # sortedClients = sorted(clients, key = lambda s: sum(map(ord, s[1])), reverse=False)
+                sortedClients = clients
+                sortedClients.append(permaClients["primary"])
+            else:
+                sortedClients = clients
             selfIndex = 0
             while selfIndex < len(sortedClients):
                 if sortedClients[selfIndex] == server.interface:
@@ -319,107 +451,134 @@ class configure:
                 previousClient = False
             else:
                 previousClient = sortedClients[selfIndex - 1]
+            pytools.IO.saveJson(".\\daisyChain.json", {
+                "chain": [previousClient, nextClient]
+            })
             return [previousClient, nextClient]
         
         def setValues(skip=False):
             clients = configure.vban.getDaisyChain()
             
-            if (clients != configure.vban.clientsOld) or skip:
-            
-                if clients[0]:
+            if clients[0] != False:
+                if globals.instance.get("vban.instream[0].ip", string=True) != clients[0]:
                     globals.instance.set("vban.instream[0].name", "StreamClock")
                     globals.instance.set("vban.instream[0].ip", clients[0])
                     globals.instance.set("vban.instream[0].port", 6980)
                     globals.instance.set("vban.instream[0].route", 5)
                     globals.instance.set("vban.instream[0].on", 1)
-                    
+                
+                if globals.instance.get("vban.instream[1].ip", string=True) != clients[0]:
                     globals.instance.set("vban.instream[1].name", "StreamFireplace")
                     globals.instance.set("vban.instream[1].ip", clients[0])
                     globals.instance.set("vban.instream[1].port", 6980)
                     globals.instance.set("vban.instream[1].route", 6)
                     globals.instance.set("vban.instream[1].on", 1)
                     
+                if globals.instance.get("vban.instream[2].ip", string=True) != clients[0]:
                     globals.instance.set("vban.instream[2].name", "StreamWindow")
                     globals.instance.set("vban.instream[2].ip", clients[0])
                     globals.instance.set("vban.instream[2].port", 6980)
                     globals.instance.set("vban.instream[2].route", 7)
                     globals.instance.set("vban.instream[2].on", 1)
-                    
+                
+                if globals.instance.get("vban.instream[3].ip", string=True) != clients[0]:
                     globals.instance.set("vban.instream[3].name", "StreamOutside")
                     globals.instance.set("vban.instream[3].ip", clients[0])
                     globals.instance.set("vban.instream[3].port", 6980)
                     globals.instance.set("vban.instream[3].route", 0)
                     globals.instance.set("vban.instream[3].on", 1)
-                    
-                    globals.instance.set("vban.instream[4].name", "StreamWindown")
+                
+                if globals.instance.get("vban.instream[4].ip", string=True) != clients[0]:
+                    globals.instance.set("vban.instream[4].name", "StreamPorch")
                     globals.instance.set("vban.instream[4].ip", clients[0])
                     globals.instance.set("vban.instream[4].port", 6980)
                     globals.instance.set("vban.instream[4].route", 1)
                     globals.instance.set("vban.instream[4].on", 1)
-                    
+                
+                if globals.instance.get("vban.instream[5].ip", string=True) != clients[0]:
                     globals.instance.set("vban.instream[5].name", "StreamGeneric")
                     globals.instance.set("vban.instream[5].ip", clients[0])
                     globals.instance.set("vban.instream[5].port", 6980)
                     globals.instance.set("vban.instream[5].route", 2)
                     globals.instance.set("vban.instream[5].on", 1)
-                    
+                
+                if globals.instance.get("vban.instream[6].ip", string=True) != clients[0]:
                     globals.instance.set("vban.instream[6].name", "StreamLight")
                     globals.instance.set("vban.instream[6].ip", clients[0])
                     globals.instance.set("vban.instream[6].port", 6980)
                     globals.instance.set("vban.instream[6].route", 3)
                     globals.instance.set("vban.instream[6].on", 1)
+            
+            if clients[1] != False:
+                if globals.instance.get("vban.outstream[0].ip", string=True) != clients[1]:
+                    globals.instance.set("vban.outstream[0].name", "StreamClock")
+                    globals.instance.set("vban.outstream[0].ip", clients[1])
+                    globals.instance.set("vban.outstream[0].port", 6980)
+                    globals.instance.set("vban.outstream[0].route", 1)
+                    globals.instance.set("vban.outstream[0].channel", 8)
+                    globals.instance.set("vban.outstream[0].on", 1)
                 
-                globals.instance.set("vban.outstream[0].name", "StreamClock")
-                globals.instance.set("vban.outstream[0].ip", clients[1])
-                globals.instance.set("vban.outstream[0].port", 6980)
-                globals.instance.set("vban.outstream[0].route", 1)
-                globals.instance.set("vban.outstream[0].on", 1)
+                if globals.instance.get("vban.outstream[1].ip", string=True) != clients[1]:
+                    globals.instance.set("vban.outstream[1].name", "StreamFireplace")
+                    globals.instance.set("vban.outstream[1].ip", clients[1])
+                    globals.instance.set("vban.outstream[1].port", 6980)
+                    globals.instance.set("vban.outstream[1].route", 2)
+                    globals.instance.set("vban.outstream[1].channel", 8)
+                    globals.instance.set("vban.outstream[1].on", 1)
                 
-                globals.instance.set("vban.outstream[1].name", "StreamFireplace")
-                globals.instance.set("vban.outstream[1].ip", clients[1])
-                globals.instance.set("vban.outstream[1].port", 6980)
-                globals.instance.set("vban.outstream[1].route", 2)
-                globals.instance.set("vban.outstream[1].on", 1)
+                if globals.instance.get("vban.outstream[2].ip", string=True) != clients[1]:
+                    globals.instance.set("vban.outstream[2].name", "StreamWindow")
+                    globals.instance.set("vban.outstream[2].ip", clients[1])
+                    globals.instance.set("vban.outstream[2].port", 6980)
+                    globals.instance.set("vban.outstream[2].route", 3)
+                    globals.instance.set("vban.outstream[2].channel", 8)
+                    globals.instance.set("vban.outstream[2].on", 1)
                 
-                globals.instance.set("vban.outstream[2].name", "StreamWindow")
-                globals.instance.set("vban.outstream[2].ip", clients[1])
-                globals.instance.set("vban.outstream[2].port", 6980)
-                globals.instance.set("vban.outstream[2].route", 3)
-                globals.instance.set("vban.outstream[2].on", 1)
+                if globals.instance.get("vban.outstream[3].ip", string=True) != clients[1]:
+                    globals.instance.set("vban.outstream[3].name", "StreamOutside")
+                    globals.instance.set("vban.outstream[3].ip", clients[1])
+                    globals.instance.set("vban.outstream[3].port", 6980)
+                    globals.instance.set("vban.outstream[3].route", 4)
+                    globals.instance.set("vban.outstream[3].on", 1)
                 
-                globals.instance.set("vban.outstream[3].name", "StreamOutside")
-                globals.instance.set("vban.outstream[3].ip", clients[1])
-                globals.instance.set("vban.outstream[3].port", 6980)
-                globals.instance.set("vban.outstream[3].route", 4)
-                globals.instance.set("vban.outstream[3].on", 1)
+                if globals.instance.get("vban.outstream[4].ip", string=True) != clients[1]:
+                    globals.instance.set("vban.outstream[4].name", "StreamPorch")
+                    globals.instance.set("vban.outstream[4].ip", clients[1])
+                    globals.instance.set("vban.outstream[4].port", 6980)
+                    globals.instance.set("vban.outstream[4].route", 5)
+                    globals.instance.set("vban.outstream[4].on", 1)
                 
-                globals.instance.set("vban.outstream[4].name", "StreamWindown")
-                globals.instance.set("vban.outstream[4].ip", clients[1])
-                globals.instance.set("vban.outstream[4].port", 6980)
-                globals.instance.set("vban.outstream[4].route", 5)
-                globals.instance.set("vban.outstream[4].on", 1)
+                if globals.instance.get("vban.outstream[5].ip", string=True) != clients[1]:
+                    globals.instance.set("vban.outstream[5].name", "StreamGeneric")
+                    globals.instance.set("vban.outstream[5].ip", clients[1])
+                    globals.instance.set("vban.outstream[5].port", 6980)
+                    globals.instance.set("vban.outstream[5].route", 6)
+                    globals.instance.set("vban.outstream[5].on", 1)
                 
-                globals.instance.set("vban.outstream[5].name", "StreamGeneric")
-                globals.instance.set("vban.outstream[5].ip", clients[1])
-                globals.instance.set("vban.outstream[5].port", 6980)
-                globals.instance.set("vban.outstream[5].route", 6)
-                globals.instance.set("vban.outstream[5].on", 1)
+                if globals.instance.get("vban.outstream[6].ip", string=True) != clients[1]:
+                    globals.instance.set("vban.outstream[6].name", "StreamLight")
+                    globals.instance.set("vban.outstream[6].ip", clients[1])
+                    globals.instance.set("vban.outstream[6].port", 6980)
+                    globals.instance.set("vban.outstream[6].route", 7)
+                    globals.instance.set("vban.outstream[6].on", 1)
                 
-                globals.instance.set("vban.outstream[6].name", "StreamLight")
-                globals.instance.set("vban.outstream[6].ip", clients[1])
-                globals.instance.set("vban.outstream[6].port", 6980)
-                globals.instance.set("vban.outstream[6].route", 7)
-                globals.instance.set("vban.outstream[6].on", 1)
+            if globals.instance.get("vban.Enable") != 1:
+                globals.instance.set("vban.Enable", 1)
                 
-                if globals.instance.get("vban.Enable") != 1:
-                    globals.instance.set("vban.Enable", 1)
-                    
-                configure.vban.clientsOld = clients
+            configure.vban.clientsOld = clients
             
     def handler():
+        # sb = sandboxie.Sandboxie()
+        # sb.start("py.exe multiVm.py --run --id=0", box="foo", wait=False)
+        
         try:
-            configure.vban.setValues(skip=True)
-            configure.local.setOutputs()
+            while configure.vban.clientsOld != configure.vban.getDaisyChain():
+                try:
+                    configure.local.setOutputs()
+                    configure.vban.setValues(skip=True)
+                except:
+                    print(traceback.format_exc())
+                time.sleep(1)
             configure.vban.clientsOld = []
             vm.changed = True
         except:
@@ -436,7 +595,7 @@ class configure:
                     os.system("del speakerSets.json /f /q")
                     counter = 0
                 counter = counter + 1
-                time.sleep(30)
+                time.sleep(1 + (2 * random.random()))
             except:
                 print(traceback.format_exc())
                 time.sleep(1)
