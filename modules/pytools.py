@@ -157,6 +157,17 @@ class IO:
             print("Unexpected error:", sys.exc_info())
             error = 1
         return error
+    
+    def appendBytes(path, jsonData):
+        error = 0
+        try:
+            file = open(path, "ab")
+            file.write(jsonData)
+            file.close()
+        except:
+            print("Unexpected error:", sys.exc_info())
+            error = 1
+        return error
 
     def saveList(path, list: Array):
         error = 0
@@ -796,7 +807,7 @@ class net:
         data_json = json.loads(response.read())
         return data_json
     
-    def getRawAPI(url, myobj):
+    def getRawAPI(url, myobj, timeout=10):
         ssl._create_default_https_context = ssl._create_unverified_context
         req = urllib.request.Request(
             url, 
@@ -805,7 +816,7 @@ class net:
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
             }
         )
-        response = urlopen(req)
+        response = urlopen(req, timeout=timeout)
         data_json = response.read()
         return data_json
 

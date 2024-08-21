@@ -6,3 +6,12 @@ null
 testEnv.derp
 *.zip
 *.wav
+permaclients.json
+daisyChain.json
+benchmark.json
+parody.py
+requirements.txt
+stream.py
+updateOld.py
+pip.list
+streams/

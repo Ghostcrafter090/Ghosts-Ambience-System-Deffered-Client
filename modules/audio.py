@@ -2,10 +2,10 @@ import time
 import math
 import os
 import random
-import traceback
 import sys
 import atexit
 import signal
+import faulthandler
 
 if not os.path.exists(".\\logs"):
     os.system("mkdir \".\\logs\"")
@@ -19,10 +19,15 @@ class log:
     hasLogged = False
     dateString = ""
     timeString = ""
+    profile = True
+
+    doPrint = False
+    debug = True
     
     def crash(*strff):
         for strf in strff:
-            print(str(strf))
+            if log.doPrint or log.debug:
+                print(str(strf))
             if not log.hasLogged:
                 log.data.append([pytools.clock.getDateTime(), str(strf), str(traceback.format_stack())])
                 if ("Traceback" in str(strf)) or ("Error" in str(strf)) or ("error" in str(strf)) or ("Failed" in str(strf)) or ("failed" in str(strf)) or ("Unable" in str(strf)) or ("unable" in str(strf)) or ("WARNING" in str(strf)) or ("Warning" in str(strf)) or ("warning" in str(strf)):
@@ -70,7 +75,7 @@ class log:
             dateArray = data[0]
             message = str(data[1])
             callStack = str(data[2])
-            pytools.IO.appendFile(".\\logs\\today\\event_" + log.timeString + ".log", "\n" + str(dateArray) + " :;: " + message + " :;: " + callStack.replace("\n", "    \\n\t"))
+            # pytools.IO.appendFile(".\\logs\\today\\event_" + log.timeString + ".log", "\n" + str(dateArray) + " :;: " + message + " :;: " + callStack.replace("\n", "    \\n\t"))
 
 def printDebug(strf):
     log.crash(strf)
@@ -81,6 +86,17 @@ def exit_handler():
 
 def kill_handler(*args):
     sys.exit(0)
+
+class traceback:
+    def format_exc():
+        return ""
+    
+    def format_stack():
+        return ""
+
+if log.debug:
+    import traceback as f
+    traceback = f
     
 def exception_handler(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, KeyboardInterrupt):
@@ -94,9 +110,196 @@ def exception_handler(exc_type, exc_value, exc_traceback):
 
 sys.excepthook = exception_handler
 
+class pytools:
+    class clock:
+        def getDateTime(utc = False):
+            from datetime import datetime
+            if utc:
+                daten = datetime.utcnow()
+            else:
+                daten = datetime.now()
+            dateArray = [1970, 1, 1, 0, 0, 0]
+            dateArray[0] = int(str(daten).split(" ")[0].split("-")[0])
+            dateArray[1] = int(str(daten).split(" ")[0].split("-")[1])
+            dateArray[2] = int(str(daten).split(" ")[0].split("-")[2])
+            dateArray[3] = int(str(daten).split(" ")[1].split(":")[0])
+            dateArray[4] = int(str(daten).split(" ")[1].split(":")[1])
+            dateArray[5] = int(str(daten).split(" ")[1].split(":")[2].split(".")[0])
+            return dateArray
+    
+    class cipher:  
+        def base64_encode(s):
+            import base64
+            encode = base64.standard_b64encode(bytes(s, encoding="utf-8")).decode("utf-8").replace("=", "?")
+            return encode
+            
+        def base64_decode(s: str):
+            import base64
+            decode = base64.standard_b64decode(s.replace("?", "=")).decode("utf-8")
+            return decode
+    
+    class IO:
+        def getJson(path, doPrint=True):
+            import json
+            import sys
+            error = 0
+            try:
+                file = open(path, "r")
+                jsonData = json.loads(file.read())
+                file.close()
+            except:
+                if doPrint:
+                    log.crash("Unexpected error: " + traceback.format_exc())
+                error = 1
+            if error != 0:
+                jsonData = error
+            return jsonData
+        
+        def getXml(path, doPrint=True):
+            import xmltodict
+            return xmltodict.parse(pytools.IO.getFile(path, doPrint=doPrint))
+        
+        def saveXml(path, doPrint=True):
+            pass
+
+        def saveJson(path, jsonData):
+            import json
+            import sys
+            error = 0
+            try:
+                file = open(path, "w")
+                file.write(json.dumps(jsonData))
+                file.close()
+            except:
+                log.crash("Unexpected error: " + traceback.format_exc())
+                error = 1
+            return error
+
+        def getFile(path, doPrint=True):
+            import sys
+            error = 0
+            try:
+                file = open(path, "r")
+                jsonData = file.read()
+                file.close()
+            except:
+                if doPrint:
+                    log.crash("Unexpected error: " + traceback.format_exc())
+                error = 1
+            if error != 0:
+                jsonData = error
+            return jsonData
+        
+        def getBytes(path, doPrint=True):
+            import sys
+            error = 0
+            try:
+                file = open(path, "rb")
+                jsonData = file.read()
+                file.close()
+            except:
+                if doPrint:
+                    log.crash("Unexpected error: " + traceback.format_exc())
+                error = 1
+            if error != 0:
+                jsonData = error
+            return jsonData
+
+        def saveFile(path, jsonData):
+            import sys
+            error = 0
+            try:
+                file = open(path, "w")
+                file.write(jsonData)
+                file.close()
+            except:
+                log.crash("Unexpected error: " + traceback.format_exc())
+                error = 1
+            return error
+        
+        def saveBytes(path, jsonData):
+            import sys
+            error = 0
+            try:
+                file = open(path, "wb")
+                file.write(jsonData)
+                file.close()
+            except:
+                log.crash("Unexpected error: " + traceback.format_exc())
+                error = 1
+            return error
+
+        def saveList(path, list):
+            import pickle
+            import sys
+            error = 0
+            try:
+                file = open(path, "wb")
+                pickle.dump(list, file)
+                file.close()
+            except:
+                log.crash("Unexpected error: " + traceback.format_exc())
+                error = 1
+            return error
+
+        def getList(path, doPrint=True):
+            import pickle
+            import sys
+            list = []
+            error = 0
+            try:
+                file = open(path, "rb")
+                jsonData = pickle.load(file)
+                file.close()
+            except:
+                if doPrint:
+                    log.crash("Unexpected error: " + traceback.format_exc())
+                error = 1
+            if error != 0:
+                jsonData = error
+            return [list, jsonData]
+
+        def appendFile(path, jsonData):
+            import sys
+            error = 0
+            try:
+                file = open(path, "a")
+                file.write(jsonData)
+                file.close()
+            except:
+                log.crash("Unexpected error: " + traceback.format_exc())
+                error = 1
+            return error
+        
+        def unpack(path, outDir):
+            import zipfile
+            try:
+                with zipfile.ZipFile(path, 'r') as zip_ref:
+                    log.crash(zip_ref.printdir())
+                    log.crash('Extracting zip resources...')
+                    zip_ref.extractall(outDir)
+                    log.crash("Done.")
+            except Exception as erro:
+                    log.crash("Could not unpack zip file.")
+                    log.crash(erro)
+
+        def pack(path, dir):
+            import shutil
+            shutil.make_archive(path, 'zip', dir)
+
 atexit.register(exit_handler)
 signal.signal(signal.SIGINT, kill_handler)
 signal.signal(signal.SIGTERM, kill_handler)
+
+class info:
+    globalSoundStart = False
+    loopSync = {}
+    skipParodyCheck = False
+    
+def intenseSleep(i):
+    x = time.time() + i
+    while time.time() < x:
+        pass
 
 class thread_handler:
     def __init__(self, obj):
@@ -179,187 +382,10 @@ testEvent = {
 
 class globals:
     bufferSize = 8
-    chunkSize = 8192
+    chunkSize = 2048
     speakers = {}
     maxCount = 100
     close = False
-
-class pytools:
-    class clock:
-        def getDateTime(utc = False):
-            from datetime import datetime
-            if utc:
-                daten = datetime.utcnow()
-            else:
-                daten = datetime.now()
-            dateArray = [1970, 1, 1, 0, 0, 0]
-            dateArray[0] = int(str(daten).split(" ")[0].split("-")[0])
-            dateArray[1] = int(str(daten).split(" ")[0].split("-")[1])
-            dateArray[2] = int(str(daten).split(" ")[0].split("-")[2])
-            dateArray[3] = int(str(daten).split(" ")[1].split(":")[0])
-            dateArray[4] = int(str(daten).split(" ")[1].split(":")[1])
-            dateArray[5] = int(str(daten).split(" ")[1].split(":")[2].split(".")[0])
-            return dateArray
-    
-    class cipher:  
-        def base64_encode(s):
-            import base64
-            encode = base64.standard_b64encode(bytes(s, encoding="utf-8")).decode("utf-8").replace("=", "?")
-            return encode
-            
-        def base64_decode(s: str):
-            import base64
-            decode = base64.standard_b64decode(s.replace("?", "=")).decode("utf-8")
-            return decode
-    
-    class IO:
-        def getJson(path, doPrint=True):
-            import json
-            import sys
-            error = 0
-            try:
-                file = open(path, "r")
-                jsonData = json.loads(file.read())
-                file.close()
-            except:
-                if doPrint:
-                    log.crash("Unexpected error:", sys.exc_info())
-                error = 1
-            if error != 0:
-                jsonData = error
-            return jsonData
-        
-        def getXml(path, doPrint=True):
-            import xmltodict
-            return xmltodict.parse(pytools.IO.getFile(path, doPrint=doPrint))
-        
-        def saveXml(path, doPrint=True):
-            pass
-
-        def saveJson(path, jsonData):
-            import json
-            import sys
-            error = 0
-            try:
-                file = open(path, "w")
-                file.write(json.dumps(jsonData))
-                file.close()
-            except:
-                log.crash("Unexpected error:", sys.exc_info())
-                error = 1
-            return error
-
-        def getFile(path, doPrint=True):
-            import sys
-            error = 0
-            try:
-                file = open(path, "r")
-                jsonData = file.read()
-                file.close()
-            except:
-                if doPrint:
-                    log.crash("Unexpected error:", sys.exc_info())
-                error = 1
-            if error != 0:
-                jsonData = error
-            return jsonData
-        
-        def getBytes(path, doPrint=True):
-            import sys
-            error = 0
-            try:
-                file = open(path, "rb")
-                jsonData = file.read()
-                file.close()
-            except:
-                if doPrint:
-                    log.crash("Unexpected error:", sys.exc_info())
-                error = 1
-            if error != 0:
-                jsonData = error
-            return jsonData
-
-        def saveFile(path, jsonData):
-            import sys
-            error = 0
-            try:
-                file = open(path, "w")
-                file.write(jsonData)
-                file.close()
-            except:
-                log.crash("Unexpected error:", sys.exc_info())
-                error = 1
-            return error
-        
-        def saveBytes(path, jsonData):
-            import sys
-            error = 0
-            try:
-                file = open(path, "wb")
-                file.write(jsonData)
-                file.close()
-            except:
-                log.crash("Unexpected error:", sys.exc_info())
-                error = 1
-            return error
-
-        def saveList(path, list):
-            import pickle
-            import sys
-            error = 0
-            try:
-                file = open(path, "wb")
-                pickle.dump(list, file)
-                file.close()
-            except:
-                log.crash("Unexpected error:", sys.exc_info())
-                error = 1
-            return error
-
-        def getList(path, doPrint=True):
-            import pickle
-            import sys
-            list = []
-            error = 0
-            try:
-                file = open(path, "rb")
-                jsonData = pickle.load(file)
-                file.close()
-            except:
-                if doPrint:
-                    log.crash("Unexpected error:", sys.exc_info())
-                error = 1
-            if error != 0:
-                jsonData = error
-            return [list, jsonData]
-
-        def appendFile(path, jsonData):
-            import sys
-            error = 0
-            try:
-                file = open(path, "a")
-                file.write(jsonData)
-                file.close()
-            except:
-                log.crash("Unexpected error:", sys.exc_info())
-                error = 1
-            return error
-        
-        def unpack(path, outDir):
-            import zipfile
-            try:
-                with zipfile.ZipFile(path, 'r') as zip_ref:
-                    log.crash(zip_ref.printdir())
-                    log.crash('Extracting zip resources...')
-                    zip_ref.extractall(outDir)
-                    log.crash("Done.")
-            except Exception as erro:
-                    log.crash("Could not unpack zip file.")
-                    log.crash(erro)
-
-        def pack(path, dir):
-            import shutil
-            shutil.make_archive(path, 'zip', dir)
 
 import os
 if os.path.exists(".\\soundOutputs.json"):
@@ -432,36 +458,43 @@ class stream:
     p = False
     
     def run(self):
-        printDebug(self.channels)
         
-        printDebug(self.chunksActive)
-
+        import random
+        idf = random.random()
+        
         try:
-            import time
             import math
-            log.crash((self.startPlayed + (self.duration * 1000000) + (5 * 1000000)))
-            log.crash(round(time.time() * 1000000))
             loopTic = 0
             import numpy
             import sounddevice as sd
             self.audioStream.start()
             def audioSegmentNumPy(audio):
                 return numpy.array(audio.get_array_of_samples(), dtype=numpy.float32).reshape((-1, audio.channels)) / (1 << (8 * audio.sample_width - 1))
+            self.i = 0
+            
             while (self.startPlayed + (self.duration * 1000000) + (5 * 1000000)) > round(time.time() * 1000000):
                 self.chunks = self.chunksActive
                 self.chunksActive = True
                 if (self.chunks != True) and (self.chunks != False):
                     def forChunkMapFunction(chunk):
                         if chunk:
+                            timeingInfo = ((info.globalSoundStart + self.i) - time.time())
+                            if timeingInfo > 0.005:
+                                intenseSleep(timeingInfo)
+                            elif timeingInfo < -0.005:
+                                info.globalSoundStart = info.globalSoundStart + math.fabs(timeingInfo)
                             self.audioStream.write(audioSegmentNumPy(chunk))
                         else:
-                            log.crash("Chunked Buffer Overflow!")
+                            if log.debug:
+                                log.crash("Chunked Buffer Overflow!")
+                        self.i = self.i + (chunk.duration_seconds / self.speed)
                     list(map(forChunkMapFunction, self.chunks))
                 else:
-                    log.crash("Buffer Overflow! No more input.")
+                    if log.debug:
+                        log.crash("Buffer Overflow! No more input.")
                     time.sleep(0.1)
             
-            self.audioStream.stop()        
+            self.audioStream.stop()
             self.audioStream.close()
 
             # self.p.terminate()
@@ -475,6 +508,8 @@ class stream:
 
             # self.p.terminate()
             globals.close = True
+            
+        # pytools.IO.appendFile("test_loop_syncs.cxl", "\n" + str(info.loopSync))
 
 class soundEvent:
     def __init__(self, path, volume, speed, channel, effects, balence, muteOptions=False):
@@ -537,6 +572,7 @@ class soundEvent:
                 if globals.speakers[self.channel][0] != sd.query_devices()[deviceIndex]["name"]:
                     import sounddevice as sd
                     devices = sd.query_devices()
+                    return
                     for n in devices:
                         import time
                         time.sleep(0.1)
@@ -706,8 +742,9 @@ class soundEvent:
                 import math
                 shift = (20 * math.log(self.volume / 100, 10))
                 self.data = self.data + shift
-                if (type(self.data) == float) or (self.data == False):
+                if (type(self.data) == float) or (self.data == False): # < possible problem (returning on datatype False)
                     return
+                
                 # for effect in self.effects:
                 def handleEffectsMapFunction(effect):
                     if globals.close:
@@ -718,6 +755,16 @@ class soundEvent:
                 self.itsStream.chunksActive = pydub.utils.make_chunks(self.data, globals.chunkSize)
                 self.lastPlayed = (startPlayed + (self.index * 1000000)) / 1000000
                 self.itsStream.lastPlayed = self.lastPlayed
+                
+                def syncEventKey(idf):
+                    return info.loopSync[idf]
+                
+                try:
+                    if (max(info.loopSync, key=syncEventKey) - min(info.loopSync, key=syncEventKey)) < 0.01:
+                        info.skipParodyCheck = True
+                except:
+                    pass
+                
                 while self.itsStream.chunksActive != True:
                     if globals.close:
                         return
@@ -845,6 +892,8 @@ class multiEvent:
                 time.sleep(0.1)
         list(map(streamWaitMapFunction, self.syncEvents))
             
+        info.globalSoundStart = time.time() + 3
+            
         printDebug(5)
         # for sound in self.syncEvents:
         def streamThreadAppendMapFunction(sound):
@@ -855,13 +904,10 @@ class multiEvent:
             self.streamThreads.append(threading.Thread(target=thread_handler(sound.itsStream.run).run))
             self.handlerThreads.append(threading.Thread(target=thread_handler(sound.handleRun).run))
         list(map(streamThreadAppendMapFunction, self.syncEvents))
-            
+        
         printDebug(6)
         # for thread in self.streamThreads:
         def threadStartMapFunction(thread):
-            import time
-            time.sleep(0.05)
-            printDebug(thread)
             thread.start()
         list(map(threadStartMapFunction, self.streamThreads))
         
@@ -870,8 +916,6 @@ class multiEvent:
         printDebug(7)
         # for thread in self.handlerThreads:
         def handlerThreadStartMapFunction(thread):
-            import time
-            time.sleep(0.05)
             # printDebug("launching: " + str(i))
             thread.start()
         list(map(handlerThreadStartMapFunction, self.handlerThreads))
@@ -1320,7 +1364,15 @@ for arg in sys.argv:
     import os
     log.crash(os.getpid())
     if arg.split("=")[0] == "--event":
+        if log.debug:
+            dateArray = pytools.clock.getDateTime()
+            log.dateString = str(dateArray[0]) + "-" + str(dateArray[1]) + "-" + str(dateArray[2])
+            log.timeString =  str(dateArray[3]) + "."  + str(dateArray[4]) + "."  + str(dateArray[5]) + "_" + str(time.time() * 100000).split(".")[0]
+            if not os.path.exists(".\\logs\\errors\\" + log.dateString):
+                os.mkdir(".\\logs\\errors\\" + log.dateString)
+            faulthandler.enable(open(".\\logs\\errors\\" + log.dateString + "\\event_" + log.timeString + ".log", "a"))
         import json
+        print(arg.split("=")[1])
         eventData = json.loads(pytools.cipher.base64_decode(arg.split("=")[1]))
         multiEvent(eventData).run()
         

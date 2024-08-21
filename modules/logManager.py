@@ -25,7 +25,7 @@ def init(pluginf):
             pass
         
 class settings:
-    debug = True
+    debug = False
     logErrors = True
     hasStarted = False
 

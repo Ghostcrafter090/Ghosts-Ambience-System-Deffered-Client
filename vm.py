@@ -1,16 +1,24 @@
-import voicemeeter
+import traceback
+try:
+    import voicemeeter
+except:
+    print(traceback.format_exc())
 import sounddevice as sd
 import time
 import os
 import psutil
 import modules.pytools as pytools
+import modules.vban as vban
 import subprocess
 import urllib.parse
 import json
-import traceback
 import modules.audio as audio
 import random
 import modules.logManager as log
+import faulthandler
+import copy
+
+log.settings.debug = True
 
 print = log.printLog
 
@@ -23,6 +31,7 @@ class globals:
     
 class flags:
     restart = False
+    manualReturn = False
 
 class server:
     
@@ -57,22 +66,54 @@ class server:
         
         def connect():
             oldSettings = pytools.IO.getJson("serverSettings.json")
+            if os.path.exists("forceServerSettings.derp"):
+                try:
+                    pytools.net.getJsonAPI("http://" + oldSettings["ip"] + ":5597?json=" + urllib.parse.quote(json.dumps({
+                                "command": "ping",
+                                "data": {
+                                    "ipAddress": oldSettings["interface"]
+                                }
+                            })), timeout=5)
+                except:
+                    print(traceback.format_exc())
+                return [oldSettings["ip"], oldSettings["interface"]]
+                
+            os.system("ping " + oldSettings["ip"] + " -n 1")
             try:
                 print("Attempting to connect to last known ip address " + oldSettings["ip"] + "...")
-                pytools.net.getJsonAPI("http://" + oldSettings["interface"] + ":4507?json=" + urllib.parse.quote(json.dumps({
-                    "command": "ping"
-                })), timeout=1)
-                if not os.path.exists("wokeUp.derp"):
+                # pytools.net.getJsonAPI("http://" + oldSettings["interface"] + ":4507?json=" + urllib.parse.quote(json.dumps({
+                #    "command": "ping"
+                # })), timeout=1)
+                tryCount = 0
+                connected = False
+                while (tryCount < 3) and (not connected):
+                    try:
+                        if not os.path.exists("wokeUp.derp"):
+                            pytools.net.getJsonAPI("http://" + oldSettings["ip"] + ":5597?json=" + urllib.parse.quote(json.dumps({
+                                "command": "ping",
+                                "data": {
+                                    "ipAddress": oldSettings["interface"]
+                                }
+                            })), timeout=5)
+                        connected = True
+                    except:
+                        print(traceback.format_exc())
+                    tryCount = tryCount + 1
+
+                if (not os.path.exists("wokeUp.derp")) and (not connected):
                     pytools.net.getJsonAPI("http://" + oldSettings["ip"] + ":5597?json=" + urllib.parse.quote(json.dumps({
                         "command": "ping",
                         "data": {
                             "ipAddress": oldSettings["interface"]
                         }
-                    })), timeout=1)
+                    })), timeout=5)
+
                 outIp = [oldSettings["ip"], oldSettings["interface"]]
             except:
+                print(traceback.format_exc())
                 finished = False
-                while not finished:
+                errorCount = 0
+                while (not finished) or (errorCount < 2):
                     arp = server.con.arp()
                     for interface in server.con.arp():
                         try:
@@ -96,16 +137,21 @@ class server:
                                     "data": {
                                         "ipAddress": interface
                                     }
-                                })), timeout=1)
+                                })), timeout=3)
                                 outIp = [ip, interface]
                                 finished = True
                                 break
                             except:
                                 print("Failed to connect.")
+                    errorCount = errorCount + 1
                 pytools.IO.saveJson("serverSettings.json", {
                     "ip": outIp[0],
                     "interface": outIp[1]
                 })
+
+                if errorCount >= 2:
+                    return -1
+
             if outIp[0] == outIp[1]:
                 if not os.path.exists(".\\testEnv.derp"):
                     return False
@@ -113,8 +159,12 @@ class server:
     
     def startConnection():
         con = server.con.connect()
-        server.hostname = con[0]
-        server.interface = con[1]
+        if con == -1:
+            server.hostname = pytools.IO.getJson("serverSettings.json")["ip"]
+            server.interface = pytools.IO.getJson("serverSettings.json")["interface"]
+        else:
+            server.hostname = con[0]
+            server.interface = con[1]
     
     def grabOtherComputers():
         server.startConnection()
@@ -124,7 +174,7 @@ class server:
             })), timeout=1)
         except:
             print("Connection Failed.")
-            while True:
+            while not flags.restart:
                 server.startConnection()
                 try:
                     return pytools.net.getJsonAPI("http://" + server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
@@ -135,6 +185,22 @@ class server:
 
 class vm:
     changed = True
+    
+    def isProcessResponding(name):
+        output = subprocess.getoutput('tasklist /FI "IMAGENAME eq ' + name + '" /FI "STATUS eq running"').split("\n")
+        if name in output[-1].split()[0]:
+            return True
+        else:
+            return False
+        
+    def fixStatus():
+        while not flags.restart:
+            if not vm.isProcessResponding("voicemeeter8.exe"):
+                if os.path.exists("..\Voicemeeter.lnk"):
+                    if ("voicemeeter8.exe" in (p.name() for p in psutil.process_iter())) == True:
+                        os.system("taskkill /f /im voicemeeter8.exe")
+                    os.system('start /b "" ..\Voicemeeter.lnk')
+            time.sleep(5)
     
     def checkStatus():
         try:
@@ -196,30 +262,30 @@ class configure:
             while i < len(sortedKey):
                 outFinal.append(out[sortedKey[i][0]])
                 i = i + 1
-            clock = False
-            fireplace = False
-            window = False
-            for device in devices:
-                if device["name"] == "VoiceMeeter Input (VB-Audio Voi":
-                    clock = True
-                if device["name"] == "VoiceMeeter Aux Input (VB-Audio":
-                    fireplace = True
-                if device["name"] == "VoiceMeeter VAIO3 Input (VB-Aud":
-                    window = True
+            # clock = False
+            # fireplace = False
+            # window = False
+            # for device in devices:
+            #     if device["name"] == "VoiceMeeter Input (VB-Audio Voi":
+            #         clock = True
+            #     if device["name"] == "VoiceMeeter Aux Input (VB-Audio":
+            #         fireplace = True
+            #     if device["name"] == "VoiceMeeter VAIO3 Input (VB-Aud":
+            #         window = True
             
-            soundOutputs = False
-            if clock:
-                if fireplace:
-                    if window:
-                        soundOutputs = {
-                            "clock": ["VoiceMeeter Input (VB-Audio Voi", "MME"],
-                            "fireplace": ["VoiceMeeter Aux Input (VB-Audio", "MME"],
-                            "window": ["VoiceMeeter VAIO3 Input (VB-Aud", "MME"],
-                            "outside": [outFinal[0]["name"], "MME"],
-                            "porch": [outFinal[1]["name"], "MME"],
-                            "generic": [outFinal[2]["name"], "MME"],
-                            "light": [outFinal[3]["name"], "MME"]
-                        }
+            # soundOutputs = False
+            # if clock:
+                # if fireplace:
+                    # if window:
+            soundOutputs = {
+                "clock": [outFinal[0]["name"], "MME"], # ["VoiceMeeter Input (VB-Audio Voi", "MME"],
+                "fireplace": [outFinal[1]["name"], "MME"], # ["VoiceMeeter Aux Input (VB-Audio", "MME"],
+                "window": [outFinal[2]["name"], "MME"], # ["VoiceMeeter VAIO3 Input (VB-Aud", "MME"],
+                "outside": [outFinal[3]["name"], "MME"],
+                "porch": [outFinal[4]["name"], "MME"],
+                "generic": [outFinal[5]["name"], "MME"],
+                "light": [outFinal[6]["name"], "MME"]
+            }
             
             # if soundOutputs:
             #     try:
@@ -317,9 +383,9 @@ class configure:
         def getInputs():
             outputs = configure.local.getOutputs()
             soundInputs = {
-                "clock": ["VoiceMeeter Input (VB-Audio Voi", "MME"],
-                "fireplace": ["VoiceMeeter Aux Input (VB-Audio", "MME"],
-                "window": ["VoiceMeeter VAIO3 Input (VB-Aud", "MME"],
+                "clock": ["", "MME"], # ["VoiceMeeter Input (VB-Audio Voi", "MME"],
+                "fireplace": ["", "MME"], # ["VoiceMeeter Aux Input (VB-Audio", "MME"],
+                "window": ["", "MME"], # ["VoiceMeeter VAIO3 Input (VB-Aud", "MME"],
                 "outside": ["", "MME"],
                 "porch": ["", "MME"],
                 "generic": ["", "MME"],
@@ -343,6 +409,9 @@ class configure:
                     input = input[:-1]
                 sortedKey.append(input)
             
+            soundInputs["clock"] = [sortedKey[0], "MME"]
+            soundInputs["fireplace"] = [sortedKey[1], "MME"]
+            soundInputs["window"] = [sortedKey[2], "MME"]
             soundInputs["outside"] = [sortedKey[3], "MME"]
             soundInputs["porch"] = [sortedKey[4], "MME"]
             soundInputs["generic"] = [sortedKey[5], "MME"]
@@ -420,8 +489,12 @@ class configure:
     
     class vban:
         clientsOld = [False, False]
+        previousDaisyChain = [False, "0.0.0.0"]
+        
+        isAloneCheck = 0
         
         def getDaisyChain():
+            print("Grabbing clients...")
             clients = server.grabOtherComputers()["hosts"]
             if "0.0.0.0" in clients:
                 clients.remove("0.0.0.0")
@@ -442,11 +515,23 @@ class configure:
                 selfIndex = selfIndex + 1
             try:
                 if selfIndex == (len(sortedClients) - 1):
-                    nextClient = server.hostname
+                    configure.vban.isAloneCheck = configure.vban.isAloneCheck + 1
+                    print("Is End Of Chain Check: " + str(configure.vban.isAloneCheck))
+                    if configure.vban.isAloneCheck > 20:
+                        nextClient = server.hostname
+                    else:
+                        return configure.vban.previousDaisyChain
                 else:
                     nextClient = sortedClients[selfIndex + 1]
+                    configure.vban.isAloneCheck = 0
             except:
-                nextClient = server.hostname
+                print(traceback.format_exc())
+                print("Is End Of Chain Check: " + str(configure.vban.isAloneCheck))
+                configure.vban.isAloneCheck = configure.vban.isAloneCheck + 1
+                if configure.vban.isAloneCheck > 20:
+                    nextClient = server.hostname
+                else:
+                    return configure.vban.previousDaisyChain
             if selfIndex == 0:
                 previousClient = False
             else:
@@ -454,10 +539,14 @@ class configure:
             pytools.IO.saveJson(".\\daisyChain.json", {
                 "chain": [previousClient, nextClient]
             })
+            configure.vban.previousDaisyChain = [previousClient, nextClient]
             return [previousClient, nextClient]
         
         def setValues(skip=False):
             clients = configure.vban.getDaisyChain()
+            
+            if flags.manualReturn:
+                clients[1] = flags.manualReturn
             
             if clients[0] != False:
                 if globals.instance.get("vban.instream[0].ip", string=True) != clients[0]:
@@ -570,7 +659,7 @@ class configure:
     def handler():
         # sb = sandboxie.Sandboxie()
         # sb.start("py.exe multiVm.py --run --id=0", box="foo", wait=False)
-        
+
         try:
             while configure.vban.clientsOld != configure.vban.getDaisyChain():
                 try:
@@ -599,6 +688,261 @@ class configure:
             except:
                 print(traceback.format_exc())
                 time.sleep(1)
+    
+
+class streams:
+
+    lastUpdated = time.time()
+    exitf = False
+    hasExited = False
+    isRunning = False
+    
+    def shutdown():
+        streams.exitf = True
+        while (not streams.hasExited) and streams.isRunning:
+            streams.exitf = True
+            time.sleep(1)
+            
+        streams.hasExited = False
+
+    def handler():
+        streams.exitf = False
+        streams.isRunning = True
+        
+        try:
+            outputs = configure.local.getOutputs()
+            outputsOld = outputs
+            pytools.IO.saveJson(".\\soundOutputs.json", outputs)
+            
+            audio.tools.setOutputs()
+
+            clients = configure.vban.getDaisyChain()
+            clientsOld = clients
+
+            if flags.manualReturn:
+                clients[1] = flags.manualReturn
+
+            streamClock = vban.speaker("clock", clients[0], clients[1])
+            streamFireplace = vban.speaker("fireplace", clients[0], clients[1])
+            streamWindow = vban.speaker("window", clients[0], clients[1])
+            streamOutside = vban.speaker("outside", clients[0], clients[1])
+            streamPorch = vban.speaker("porch", clients[0], clients[1])
+            streamGeneric = vban.speaker("generic", clients[0], clients[1])
+            streamLight = vban.speaker("light", clients[0], clients[1])
+
+            streamClock.serverHostname = server.hostname
+            streamFireplace.serverHostname = server.hostname
+            streamWindow.serverHostname = server.hostname
+            streamOutside.serverHostname = server.hostname
+            streamPorch.serverHostname = server.hostname
+            streamGeneric.serverHostname = server.hostname
+            streamLight.serverHostname = server.hostname
+            
+            
+            streamClock.run()
+            streamFireplace.run()
+            streamWindow.run()
+            streamOutside.run()
+            streamPorch.run()
+            streamGeneric.run()
+            streamLight.run()
+
+            exitf = False
+
+            lastUpdatedOld = streams.lastUpdated
+        except:
+            print(traceback.format_exc())
+
+        while (not flags.restart) and (not exitf) and not (streams.exitf):
+            streams.isRunning = True
+            try:
+                types = {}
+                for thread in vban.pyvban.utils.sender.allf.senderUUIDs:
+                    try:
+                        types[vban.pyvban.utils.sender.allf.senderUUIDs[thread][1]._stream_name] 
+                    except:
+                        types[vban.pyvban.utils.sender.allf.senderUUIDs[thread][1]._stream_name] = []
+                    types[vban.pyvban.utils.sender.allf.senderUUIDs[thread][1]._stream_name].append([thread, vban.pyvban.utils.sender.allf.senderUUIDs[thread]])
+                
+                for speaker in types:
+                    loopCount = 0
+
+                    inf = 0
+                    toRemove = {}
+                    for thread in types[speaker]:
+                        if thread[1][1]._hasStopped:
+                            vban.pyvban.utils.sender.allf.senderUUIDs.pop(thread[1][1]._uuid)
+                            if not speaker in toRemove:
+                                toRemove[speaker] = []
+                            toRemove[speaker].append(inf)
+
+                for speaker in toRemove:
+                    for intf in toRemove[speaker]:
+                        try:
+                            types[speaker].pop(intf)
+                        except:
+                            print(traceback.format_exc())
+                    
+                    
+                for speaker in types:
+                    while (len(types[speaker]) > 1) and (loopCount < 100):
+                        randomInt = random.randint(0, len(types[speaker]) - 1)
+                        randomStream = types[speaker][randomInt][1]
+                        loopCount = 0
+                        while (not randomStream[1]._hasStopped) and (loopCount < 100):
+                            try:
+                                print("Stopping thread with uuid of " + str(types[speaker][randomInt][0]))
+                                randomStream[1].stop()
+                            except:
+                                pass
+                            loopCount = loopCount + 1
+                            time.sleep(0.1)
+                        
+                        if loopCount < 100:
+                            types[speaker].pop(randomInt)
+                            vban.pyvban.utils.sender.allf.senderUUIDs.pop(randomStream[1]._uuid)
+
+                outJson = {}
+                for speaker in types:
+                    for thread in types[speaker]:
+                        if not speaker in outJson:
+                            outJson[speaker] = []
+                        outJson[speaker].append([thread[0], thread[1][0], thread[1][2]])
+                
+                pytools.IO.saveJson("streamThreads.json", {
+                    "speakers": outJson,
+                    "error": False
+                })
+            except:
+                exc = traceback.format_exc()
+                print(exc)
+                pytools.IO.saveJson("streamThreads.json", {
+                    "speakers": {},
+                    "error": exc
+                })
+
+            try:
+                clients = configure.vban.getDaisyChain()
+
+                streamClock.serverHostname = server.hostname
+                streamFireplace.serverHostname = server.hostname
+                streamWindow.serverHostname = server.hostname
+                streamOutside.serverHostname = server.hostname
+                streamPorch.serverHostname = server.hostname
+                streamGeneric.serverHostname = server.hostname
+                streamLight.serverHostname = server.hostname
+
+                outputs = configure.local.getOutputs()
+                pytools.IO.saveJson(".\\soundOutputs.json", outputs)
+
+                if flags.manualReturn:
+                    clients[1] = flags.manualReturn
+            
+                if (clientsOld != clients) or (outputsOld != outputs):
+
+                    print("Updated clients detected...")
+                
+                    audio.tools.setOutputs()
+
+                    streamClock.setReceiveFromIp(clients[0])
+                    streamClock.setSendToIp(clients[1])
+                    
+                    streamFireplace.setReceiveFromIp(clients[0])
+                    streamFireplace.setSendToIp(clients[1])
+
+                    streamWindow.setReceiveFromIp(clients[0])
+                    streamWindow.setSendToIp(clients[1])
+                    
+                    streamOutside.setReceiveFromIp(clients[0])
+                    streamOutside.setSendToIp(clients[1])
+                    
+                    streamPorch.setReceiveFromIp(clients[0])
+                    streamPorch.setSendToIp(clients[1])
+                    
+                    streamGeneric.setReceiveFromIp(clients[0])
+                    streamGeneric.setSendToIp(clients[1])
+                    
+                    streamLight.setReceiveFromIp(clients[0])
+                    streamLight.setSendToIp(clients[1])
+
+                    clientsOld = clients
+                    outputsOld = outputs
+            except:
+                print(traceback.format_exc())
+
+            try:
+                def _streamWatchDog(streamf: vban.speaker, clients):
+                    try:
+                        if ((streamf.lastUpdated + 60) < time.time()):
+                            print("Stream watchdog detected crashed stream of type" + str(streamf.speakerType) + ". Restarting...")
+                            streamf.exitf = True
+
+                            try:
+                                while not streamf.isRunning:
+                                    streamf.exitf = True
+                                    print("    > Waiting for stream of type " + str(streamf.speakerType) + " to exit...")
+                                    time.sleep(0.1)
+                            except:
+                                pass
+                            
+                            try:
+                                while not streamf.transmitterThread.vbanObj.lastActivityTimestamp:
+                                    streamf.exitf = True
+                                    print("    > Waiting for stream of type " + str(streamf.speakerType) + " to exit...")
+                                    time.sleep(0.1)
+                            except:
+                                pass
+                            
+                            
+
+                            streamNew = vban.speaker(streamf.speakerType, clients[0], clients[1])
+                            streamNew.run()
+                            return streamNew
+                    except:
+                        print(traceback.format_exc())
+                    return streamf
+
+                streamClock = _streamWatchDog(streamClock, clients)
+                streamFireplace = _streamWatchDog(streamFireplace, clients)
+                streamWindow = _streamWatchDog(streamWindow, clients)
+                streamOutside = _streamWatchDog(streamOutside, clients)
+                streamPorch = _streamWatchDog(streamPorch, clients)
+                streamGeneric = _streamWatchDog(streamGeneric, clients)
+                streamLight = _streamWatchDog(streamLight, clients)
+
+            except:
+                print(traceback.format_exc())
+
+            try:
+                if streams.lastUpdated != lastUpdatedOld:
+                    exitf = True
+                
+                streams.lastUpdated = time.time()
+                lastUpdatedOld = copy.deepcopy(streams.lastUpdated)
+            except:
+                print(traceback.format_exc())
+
+            time.sleep(1)
+            print("Handler looping...")
+
+        print("Handler has exited.")
+        streamClock.exitf = True
+        streamFireplace.exitf = True
+        streamWindow.exitf = True
+        streamOutside.exitf = True
+        streamPorch.exitf = True
+        streamGeneric.exitf = True
+        streamLight.exitf = True
+        
+        streams.isRunning = False
+        streams.hasExited = True
+        
+
+                    
+
+
+                    
+
             
             
             
