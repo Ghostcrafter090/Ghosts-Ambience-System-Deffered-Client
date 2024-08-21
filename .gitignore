@@ -15,3 +15,7 @@ stream.py
 updateOld.py
 pip.list
 streams/
+audio.build
+audio.dist
+.powershell
+.audiocache
