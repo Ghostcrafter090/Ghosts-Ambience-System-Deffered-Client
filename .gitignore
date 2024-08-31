@@ -19,6 +19,8 @@ stream.py
 updateOld.py
 pip.list
 streams/
+benchmark.json
+daisyChain.json
 settings.xml
 audio.build
 speakerSets.json
@@ -26,3 +28,6 @@ audio.dist
 .powershell
 .audiocache
 excludeInterfaces.json
+extraOutputs-comment.json
+hosts.json
+plugOutputs.json
