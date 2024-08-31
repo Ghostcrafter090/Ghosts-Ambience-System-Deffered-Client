@@ -135,7 +135,7 @@ class VBAN_Receiver:
     lastActivityTimestamp = time.time()
     lastStreamActivityTimestamp = time.time()
     
-    samplesPerFrame = 128
+    samplesPerFrame = 256
     
     packetBuffer = []
 

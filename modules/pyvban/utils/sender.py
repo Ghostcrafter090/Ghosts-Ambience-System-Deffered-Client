@@ -75,7 +75,7 @@ class VBAN_Sender:
             self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self._socket.connect(self._receiver)
 
-            self._samples_per_frame = 256
+            self._samples_per_frame = 192
 
             try:
 
