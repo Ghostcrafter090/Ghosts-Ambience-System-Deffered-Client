@@ -1,6 +1,8 @@
 *.mp3
 *.pyl
 *.pyc
+*.derp
+
 audio.dist\*
 null
 testEnv.derp
@@ -10,12 +12,17 @@ permaclients.json
 daisyChain.json
 benchmark.json
 parody.py
+test.py
+manualMax.json
 requirements.txt
 stream.py
 updateOld.py
 pip.list
 streams/
+settings.xml
 audio.build
+speakerSets.json
 audio.dist
 .powershell
 .audiocache
+excludeInterfaces.json
