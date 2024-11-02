@@ -31,3 +31,5 @@ excludeInterfaces.json
 extraOutputs-comment.json
 hosts.json
 plugOutputs.json
+logs/
+stream_buffer_underrun

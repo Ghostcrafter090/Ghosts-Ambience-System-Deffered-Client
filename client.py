@@ -24,6 +24,9 @@ import wmi
 import psutil
 import faulthandler
 
+from mutagen.mp3 import MP3
+from mutagen.wave import WAVE
+
 print = log.printLog
 
 faulthandler.enable(open(".\\logs\\fault_" + str(pytools.clock.getDateTime()[0]) + "-" + str(pytools.clock.getDateTime()[1]) + "-" + str(pytools.clock.getDateTime()[2]) + "_" + str(random.random()) + ".fault", "a"), all_threads=True)
@@ -169,75 +172,109 @@ class system:
                         return True
         
         return False
-            
+        
+    performRestart = False
+    
     def sleepHandler():
         while not flags.restart:
-            try:
-                if pytools.clock.getDateTime()[2] != system.previousDay:
-                    if not system.isNoRestartDay():
-                        system.hasDoneNightlyRestart = False
-                        system.previousDay = pytools.clock.getDateTime()[2]
-                
-                loadResponse = pytools.net.getJsonAPI("http://" + vm.server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
-                    "command": "getLoad"
-                })))
-                load = loadResponse["data"]
-                loadPercent = (load[1] / load[0]) * 100
-                print("Load Percent: " + str(loadPercent))
-                print("Current end of chain status: " + str(vm.configure.vban.getDaisyChain()[0] == False))
-                print("Current hallowed stay on status: " + str(False == ((util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) < 45) and (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) > (util.getHallowIndex(pytools.clock.dateArrayToUTC([pytools.clock.getDateTime()[0], 12, 21, 0, 0, 0]), noDay=True))))))
-                print("Current sleep state count: " + str(system.sleepStateCount))
-                if (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) < 45) and (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) > (util.getHallowIndex(pytools.clock.dateArrayToUTC([pytools.clock.getDateTime()[0], 12, 21, 0, 0, 0]), noDay=True))):
-                    if loadPercent < 50:
-                        if system.sleepStateCount > 15:
-                            if vm.configure.vban.getDaisyChain()[0] == False:
+            if os.path.exists(".\\doAutoSleep.derp"):
+                try:
+                    if pytools.clock.getDateTime()[2] != system.previousDay:
+                        if not system.isNoRestartDay():
+                            system.hasDoneNightlyRestart = False
+                            system.previousDay = pytools.clock.getDateTime()[2]
+                    
+                    loadResponse = pytools.net.getJsonAPI("http://" + vm.server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
+                        "command": "getLoad"
+                    })))
+                    load = loadResponse["data"]
+                    loadPercent = (load[1] / load[0]) * 100
+                    print("Load Percent: " + str(loadPercent))
+                    print("Current end of chain status: " + str(vm.configure.vban.getDaisyChain()[0] == False))
+                    print("Current hallowed stay on status: " + str(False == ((util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) < 45) and (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) > (util.getHallowIndex(pytools.clock.dateArrayToUTC([pytools.clock.getDateTime()[0], 12, 21, 0, 0, 0]), noDay=True))))))
+                    print("Current sleep state count: " + str(system.sleepStateCount))
+                    if (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) < 45) and (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) > (util.getHallowIndex(pytools.clock.dateArrayToUTC([pytools.clock.getDateTime()[0], 12, 21, 0, 0, 0]), noDay=True))):
+                        if loadPercent < 60:
+                            if system.sleepStateCount > 15:
+                                if vm.configure.vban.getDaisyChain()[0] == False:
+                                    system.sleepStateCount = 0
+                                    pytools.IO.saveList(".\\sleepActive.derp", "")
+                                    
+                                    system.sleepState = True
+                                else:
+                                    system.sleepStateCount = 0
+                            system.sleepStateCount = system.sleepStateCount + 1
+                        else:
+                            system.sleepStateCount = system.sleepStateCount - 1
+                            if system.sleepStateCount < 0:
                                 system.sleepStateCount = 0
-                                pytools.IO.saveList(".\\sleepActive.derp", "")
-                                
-                                system.sleepState = True
-                        system.sleepStateCount = system.sleepStateCount + 1
                     else:
+                        system.sleepStateCount = system.sleepStateCount - 1
+                        if system.sleepStateCount < 0:
+                            system.sleepStateCount = 0
+                    
+                    if system.performRestart:
                         system.sleepStateCount = 0
-                else:
-                    system.sleepStateCount = 0
-                if system.sleepState != -1:
-                    if loadPercent > 90:
-                        os.system("del \".\\sleepActive.derp\" /f /q")
-                        system.sleepState = False
-                        pytools.net.getJsonAPI("http://" + vm.server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
-                            "command": "removeBlackList"
-                        })))
-                        os.system("del \".\\wokeUp.derp\" /f /q")
-                    if system.sleepState:
+                        pytools.IO.saveList(".\\sleepActive.derp", "")
+                        system.sleepState = True
+                        system.hasDoneNightlyRestart = False
+                    
+                    if system.sleepState != -1:
+                        if (loadPercent > 90) and (not system.performRestart):
+                            os.system("del \".\\sleepActive.derp\" /f /q")
+                            system.sleepState = False
+                            pytools.net.getJsonAPI("http://" + vm.server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
+                                "command": "removeBlackList"
+                            })))
+                            os.system("del \".\\wokeUp.derp\" /f /q")
+                        if system.sleepState:
+                            pytools.net.getJsonAPI("http://" + vm.server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
+                                "command": "setBlackList"
+                            })))
+                            if puppet.getSoundCount() <= 1:
+                                vm.streams.shutdown()
+                                system.sleepStateCount = 15
+                                pytools.IO.saveFile("wokeUp.derp", "")
+                                if system.hasDoneNightlyRestart:
+                                    os.system("rundll32.exe powrprof.dll, SetSuspendState Sleep")
+                                else:
+                                    os.system("shutdown /r /t 60")
+                                    system.hasDoneNightlyRestart = True
+                    else:
+                        try:
+                            os.system("del \".\\sleepActive.derp\" /f /q")
+                            system.sleepState = False
+                            success = pytools.net.getJsonAPI("http://" + vm.server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
+                                "command": "removeBlackList"
+                            })))["status"] == "success"
+                            os.system("del \".\\wokeUp.derp\" /f /q")
+                            if success:
+                                if not vm.streams.isRunning:
+                                    threads.vbanHandler = threading.Thread(target=vm.streams.handler)
+                                    threads.vbanHandler.start()
+                                system.sleepState = False
+                        except:
+                            print(traceback.format_exc())
+                except:
+                    print(traceback.format_exc())
+            else:
+                try:
+                    if system.performRestart:
                         pytools.net.getJsonAPI("http://" + vm.server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
                             "command": "setBlackList"
                         })))
                         if puppet.getSoundCount() <= 1:
                             vm.streams.shutdown()
                             system.sleepStateCount = 15
-                            pytools.IO.saveFile("wokeUp.derp", "")
-                            if system.hasDoneNightlyRestart:
-                                os.system("rundll32.exe powrprof.dll, SetSuspendState Sleep")
-                            else:
-                                os.system("shutdown /r /t 60")
-                                system.hasDoneNightlyRestart = True
-                else:
-                    try:
-                        os.system("del \".\\sleepActive.derp\" /f /q")
-                        system.sleepState = False
-                        success = pytools.net.getJsonAPI("http://" + vm.server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
+                            os.system("shutdown /r /t 60")
+                            system.hasDoneNightlyRestart = True
+                    else:
+                        pytools.net.getJsonAPI("http://" + vm.server.hostname + ":5597?json=" + urllib.parse.quote(json.dumps({
                             "command": "removeBlackList"
-                        })))["status"] == "success"
-                        os.system("del \".\\wokeUp.derp\" /f /q")
-                        if success:
-                            if not vm.streams.isRunning:
-                                threads.vbanHandler = threading.Thread(target=vm.streams.handler)
-                                threads.vbanHandler.start()
-                            system.sleepState = False
-                    except:
-                        print(traceback.format_exc())
-            except:
-                print(traceback.format_exc())
+                        })))
+                except:
+                    print(traceback.format_exc())
+            
             time.sleep(10 * random.random() + 1)
 
 class soundRegister:
@@ -245,11 +282,31 @@ class soundRegister:
     maxSoundCount = -1
     soundCount = 0
     
+    cpuUsage = 70
+    
+    maxCPUUsage = 95
+    CPUUsageThreshold = 95
+    lastCPUThresholdAdd = time.time()
+    
+    receiverBufferErrorCounter = 0
+    
     lastAddCount = 0
     lastAddRemove = 0
     
     def run():
         while not flags.restart:
+            try:
+                if os.path.exists("stream_buffer_underrun"):
+                    response = pytools.net.getJsonAPI("http://" + vm.server.hostname + ":" + str(random.randint(6000, 6029)) + "?json=" + urllib.parse.quote(json.dumps({
+                        "command": "clientMessage",
+                        "data": {
+                            "to": vm.configure.vban.getDaisyChain()[0],
+                            "message": "bufferUnderrun"
+                        }
+                    })))
+                    os.system("del stream_buffer_underrun /f /q")
+            except:
+                print(traceback.format_exc())
             try:
                 if soundRegister.maxSoundCount == -1:
                     # puppet.killEvents()
@@ -268,8 +325,20 @@ class soundRegister:
                 soundRegister.soundCount = puppet.getSoundCount()
                 i = 0
                 while i < len(soundRegister.buffer):
+                    try:
+                        if os.path.exists("stream_buffer_underrun"):
+                            response = pytools.net.getJsonAPI("http://" + vm.server.hostname + ":" + str(random.randint(6000, 6029)) + "?json=" + urllib.parse.quote(json.dumps({
+                                "command": "clientMessage",
+                                "data": {
+                                    "to": vm.configure.vban.getDaisyChain()[0],
+                                    "message": "bufferUnderrun"
+                                }
+                            })))
+                            os.system("del stream_buffer_underrun /f /q")
+                    except:
+                        print(traceback.format_exc())
                     soundRegister.soundCount = puppet.getSoundCount()
-                    if (soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and (soundRegister.lastAddCount < 3) and vm.streams.isRunning and (not system.sleepState):
+                    if (soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and (soundRegister.lastAddCount < 3) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold):
                         soundRegister.lastAddCount = soundRegister.lastAddCount + 1
                         puppet.fireEvent(*soundRegister.buffer[i], fromBuffer=True)
                         soundRegister.buffer.pop(i)
@@ -303,12 +372,37 @@ class soundRegister:
             if soundRegister.lastAddCount < 0:
                 soundRegister.lastAddCount = 0
             
+            if (soundRegister.lastCPUThresholdAdd + 5) < time.time():
+                soundRegister.CPUUsageThreshold = soundRegister.CPUUsageThreshold + 1
+                if soundRegister.CPUUsageThreshold > soundRegister.maxCPUUsage:
+                    soundRegister.CPUUsageThreshold = soundRegister.maxCPUUsage
+            
+                soundRegister.lastCPUThresholdAdd = time.time()
+            
             time.sleep(0.1)
 
 class puppet:
     def getBenchmark():
         print("Getting benchmark...")
         return tools.benchmark.get()
+    
+    def performSystemRestart():
+        system.performRestart = True
+    
+    def bufferUnderrun():
+        try:
+            soundRegister.CPUUsageThreshold = soundRegister.CPUUsageThreshold - 5
+            if soundRegister.CPUUsageThreshold < 0:
+                soundRegister.CPUUsageThreshold = 0
+            return True
+        except:
+            return False
+    
+    def getCPUUsageThreshold():
+        return soundRegister.CPUUsageThreshold
+    
+    def getCPUUsage():
+        return soundRegister.cpuUsage
     
     def getMaxSoundCount():
         print("Running benchmark test...")
@@ -323,9 +417,12 @@ class puppet:
             soundRegister.maxSoundCount = (tools.benchmark.getNumberOfPlugins(tools.benchmark.get())) + puppet.getSoundCount()
         return soundRegister.maxSoundCount
     
-    def getSoundCount():
+    def getSoundCount(addBuffer=False):
         print("Getting sound count...")
-        return len(subprocess.getoutput("tasklist /fi \"IMAGENAME eq ambience.exe\" /fo:csv").split("\n"))
+        if addBuffer:
+            return len(subprocess.getoutput("tasklist /fi \"IMAGENAME eq ambience.exe\" /fo:csv").split("\n")) + len(soundRegister.buffer)
+        else:
+            return len(subprocess.getoutput("tasklist /fi \"IMAGENAME eq ambience.exe\" /fo:csv").split("\n"))
     
     def restart():
         print("Restarting client...")
@@ -352,7 +449,17 @@ class puppet:
         return True
     
     def fireEvent(eventBytes, fileData, fromBuffer=False):
-        if puppet.getSoundCount() < (soundRegister.maxSoundCount * 0.6):
+        duration = 0
+        try:
+            pathf = eventData["events"][i]["path"].replace("\\working\\", "\\")
+            speedf = eventData["events"][i]["speed"]
+            if pathf.find(".mp3") != -1:
+                duration = float(MP3(".\\sound\\assets\\" + pathf).info.length) / speedf
+            else:
+                duration = float(WAVE(".\\sound\\assets\\" + pathf).info.length) / speedf
+        except:
+            pass
+        if (duration > 240) or ((soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold)):
             print("Audio events received.")
             if not flags.restart:
                 if fileData:
@@ -488,6 +595,16 @@ class com:
                     self.wfile.write(bytes(json.dumps({
                         "maxSoundCount": puppet.getMaxSoundCount()
                     }), "utf-8"))
+                if request["command"] == "bufferUnderrun":
+                    successEvent = puppet.bufferUnderrun()
+                    self.wfile.write(bytes(json.dumps({
+                        "status": ("success" * successEvent) + ("failed" * (not successEvent))
+                    }), "utf-8"))
+                if request["command"] == "performFullRestart":
+                    successEvent = puppet.performSystemRestart()
+                    self.wfile.write(bytes(json.dumps({
+                        "status": ("success" * successEvent) + ("failed" * (not successEvent))
+                    }), "utf-8"))
                 if request["command"] == "getSoundQueSize":
                     self.wfile.write(bytes(json.dumps({
                         "SoundQueSize": len(soundRegister.buffer)
@@ -496,10 +613,23 @@ class com:
                     self.wfile.write(bytes(json.dumps({
                         "status": puppet.isVoicemeeterWorking()
                     }), "utf-8"))
-                if request["command"] == "getSoundCount":
+                if request["command"] == "getCPUUsageThreshold":
                     self.wfile.write(bytes(json.dumps({
-                        "soundCount": puppet.getSoundCount()
+                        "cpuUsageThreshold": puppet.getCPUUsageThreshold()
                     }), "utf-8"))
+                if request["command"] == "getCPUUsage":
+                    self.wfile.write(bytes(json.dumps({
+                        "cpuUsage": puppet.getCPUUsage()
+                    }), "utf-8"))
+                if request["command"] == "getSoundCount":
+                    if ("data" in request) and ("plusBuffer" in request["data"]) and request["data"]["plusBuffer"]:
+                        self.wfile.write(bytes(json.dumps({
+                            "soundCount": puppet.getSoundCount(addBuffer=True)
+                        }), "utf-8"))
+                    else:
+                        self.wfile.write(bytes(json.dumps({
+                            "soundCount": puppet.getSoundCount(addBuffer=False)
+                        }), "utf-8"))
                 if request["command"] == "sendAudioData":
                     self.wfile.write(bytes(json.dumps({
                         "success": puppet.receiveAudioData(request["data"]["fileName"], request["data"]["fileData"], request["data"]["isFirstSend"])
@@ -571,9 +701,8 @@ class com:
         # threads.threadVoicemeeterFixer.start()
         # threads.threadVConfigure.start()
         
-        if os.path.exists(".\\doAutoSleep.derp"):
-            threads.threadSleepHandler = threading.Thread(target=system.sleepHandler)
-            threads.threadSleepHandler.start()
+        threads.threadSleepHandler = threading.Thread(target=system.sleepHandler)
+        threads.threadSleepHandler.start()
 
         adapterResetCounter = 0
         
@@ -594,7 +723,14 @@ class com:
                 while pytools.net.getJsonAPI("http://localhost:4507?json=" + urllib.parse.quote(json.dumps({
                     "command": "ping"
                 })))["status"] == "success":
-                    time.sleep(15)
+                    try:
+                        xw = 0
+                        while xw < 15:
+                            soundRegister.cpuUsage = pytools.system.getCPU(1)
+                            time.sleep(1)
+                            xw = xw + 1
+                    except:
+                        time.sleep(15)
                 threadHttp = threading.Thread(target=com.start)
                 threadHttp.start()
                 time.sleep(1)

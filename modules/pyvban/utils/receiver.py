@@ -6,6 +6,7 @@ import traceback
 import time
 import threading
 import random
+import os
 
 from ..packet import VBANPacket
 from ..const import *
@@ -18,6 +19,7 @@ log.settings.debug = True
 class allf:
     packetBuffers = {}
     receiverUUIDs = {}
+    bufferErrorCounter = 0
 
 class logging:
 
@@ -235,6 +237,9 @@ class VBAN_Receiver:
                     else:
                         waitTime = time.time() + 1
                         print("Buffer underrun for " + str(self._stream_name) + " detected. Network thread running status: " + str(not self._networkHasStopped) + ". Collecting samples...")
+                        if not os.path.exists("stream_buffer_underrun"):
+                            log.pytools.IO.saveFile("stream_buffer_underrun", "")
+                        allf.bufferErrorCounter = allf.bufferErrorCounter + 1
                         samplesToCollect = ((self._current_pyaudio_config["rate"] / self.samplesPerFrame) * 1)
                         while (len(allf.packetBuffers[self._stream_name]) < samplesToCollect) and (waitTime > time.time()):
                             time.sleep(0.1)
@@ -277,7 +282,7 @@ class VBAN_Receiver:
         try:
             self._stream.stop()
         except:
-            print("Count not close sound stream.")
+            print("Could not close sound stream.")
         try:
             self._socket.shutdown(socket.SHUT_WR)
         except:

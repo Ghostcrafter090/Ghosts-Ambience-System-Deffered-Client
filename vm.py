@@ -502,7 +502,17 @@ class configure:
                 clients.remove("192.168.2.40")
             permaClients = pytools.IO.getJson(".\\permaclients.json")
             if permaClients["primary"] in clients:
-                clients.remove(permaClients["primary"])
+                try:
+                    clients.remove(permaClients["primary"])
+                except:
+                    pass
+                
+                try:
+                    for ignoreClient in permaClients["ignore"]:
+                        if ignoreClient in clients:
+                            clients.remove(ignoreClient)
+                except:
+                    pass
                 # sortedClients = sorted(clients, key = lambda s: sum(map(ord, s[1])), reverse=False)
                 sortedClients = clients
                 sortedClients.append(permaClients["primary"])
@@ -816,6 +826,17 @@ class streams:
             except:
                 exc = traceback.format_exc()
                 print(exc)
+                
+                try:
+                    outJson = {}
+                    for speaker in types:
+                        for thread in types[speaker]:
+                            if not speaker in outJson:
+                                outJson[speaker] = []
+                            outJson[speaker].append([thread[0], thread[1][0], thread[1][2]])
+                except:
+                    outJson = {}
+                    
                 pytools.IO.saveJson("streamThreads.json", {
                     "speakers": {},
                     "error": exc
@@ -874,7 +895,7 @@ class streams:
                 def _streamWatchDog(streamf: vban.speaker, clients):
                     try:
                         if ((streamf.lastUpdated + 60) < time.time()):
-                            print("Stream watchdog detected crashed stream of type" + str(streamf.speakerType) + ". Restarting...")
+                            print("Stream watchdog detected crashed stream of type " + str(streamf.speakerType) + ". Restarting...")
                             streamf.exitf = True
 
                             try:
