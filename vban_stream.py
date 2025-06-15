@@ -15,11 +15,6 @@ def setup(speakerType, clients, serverHostname):
 
     audio.tools.setOutputs()
 
-    # clients = vm.configure.vban.getDaisyChain()
-
-    # if vm.flags.manualReturn:
-    #     clients[1] = vm.flags.manualReturn
-
     streams.vbanStream = vban.speaker(speakerType, clients[0], clients[1])
     
     streams.vbanStream.serverHostname = serverHostname
