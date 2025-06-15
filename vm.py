@@ -346,39 +346,6 @@ class configure:
             })
             configure.vban.previousDaisyChain = [previousClient, nextClient]
             return [previousClient, nextClient]
-            
-    def handler():
-        # sb = sandboxie.Sandboxie()
-        # sb.start("py.exe multiVm.py --run --id=0", box="foo", wait=False)
-
-        try:
-            while configure.vban.clientsOld != configure.vban.getDaisyChain():
-                try:
-                    configure.local.setOutputs()
-                    configure.vban.setValues(skip=True)
-                except:
-                    print(traceback.format_exc())
-                time.sleep(1)
-            configure.vban.clientsOld = []
-            vm.changed = True
-        except:
-            pass
-        counter = 0
-        while not flags.restart:
-            try:
-                os.system("taskkill /f /im WerFault.exe")
-                if vm.changed:
-                    configure.local.setOutputs()
-                configure.vban.setValues()
-                audio.tools.setOutputs()
-                if counter > 4:
-                    os.system("del speakerSets.json /f /q")
-                    counter = 0
-                counter = counter + 1
-                time.sleep(1 + (2 * random.random()))
-            except:
-                print(traceback.format_exc())
-                time.sleep(1)
 
 class vbanStream:
     def __init__(self, speakerType):
