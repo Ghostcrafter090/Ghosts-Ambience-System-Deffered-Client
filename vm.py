@@ -196,49 +196,6 @@ class vm:
             return True
         else:
             return False
-        
-    def fixStatus():
-        while not flags.restart:
-            if not vm.isProcessResponding("voicemeeter8.exe"):
-                if os.path.exists("..\Voicemeeter.lnk"):
-                    if ("voicemeeter8.exe" in (p.name() for p in psutil.process_iter())) == True:
-                        os.system("taskkill /f /im voicemeeter8.exe")
-                    os.system('start /b "" ..\Voicemeeter.lnk')
-            time.sleep(5)
-    
-    def checkStatus():
-        try:
-            globals.instance.get("option.buffer.mme")
-        except:
-            print("regrabbing...")
-            vm.launch()
-            globals.instance = voicemeeter.remote("potato")
-            globals.instance.login()
-            vm.changed = True
-        
-    def launch():
-        if os.path.exists("C:\Program Files (x86)\VB\Voicemeeter\\voicemeeter8.exe"):
-            if os.path.exists("..\Voicemeeter.lnk"):
-                if ("voicemeeter8.exe" in (p.name() for p in psutil.process_iter())) == False:
-                    os.system("taskkill /f /im voicemeeter8.exe")
-                    os.system('start /b "" ..\Voicemeeter.lnk')
-            else:
-                if ("voicemeeter8.exe" in (p.name() for p in psutil.process_iter())) == False:
-                    installDate = pytools.clock.getDateArrayFromUST(os.path.getctime("C:\Program Files (x86)\VB\Voicemeeter\\voicemeeter8.exe"))
-                    os.system("start /d \"C:\Program Files (x86)\VB\Voicemeeter\" \"\" RunAsDate.exe /immediate /movetime " + str(installDate[2]) + "\\" + str(installDate[1]) + "\\" + str(installDate[0]) + " " + str(installDate[3]) + ":" + str(installDate[4]) + ":" + str(installDate[5]) + " \"C:\\Program Files (x86)\\VB\\Voicemeeter\\voicemeeter8.exe\"")
-        time.sleep(5)
-        
-    def handler():
-        while not flags.restart:
-            try:
-                configure.fixAudioDg()
-            except:
-                pass
-            try:
-                vm.checkStatus()
-            except:
-                pass
-            time.sleep(1)
 
 class configure:
     def fixAudioDg():
