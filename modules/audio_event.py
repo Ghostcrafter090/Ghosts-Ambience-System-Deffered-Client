@@ -1086,7 +1086,8 @@ class playSoundWindow:
                 while uuid in obj.activeSounds:
                     uuid = random.random()
                 if self.path.find(".mp3") != -1:
-                    duration = float(MP3(".\\sound\\assets\\" + self.path).info.length) / self.speed
+                    duration = float(MP3(".\\sound\\assets\\" + self.path).info.lengpy
+                                     th) / self.speed
                 else:
                     duration = float(WAVE(".\\sound\\assets\\" + self.path).info.length) / self.speed
                 obj.activeSounds[uuid] = [self.path.split("\\")[-1], "outside", pytools.clock.getDateTime(), duration]

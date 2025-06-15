@@ -17,6 +17,7 @@ import random
 import modules.logManager as log
 import faulthandler
 import copy
+import sys
 
 log.settings.debug = True
 
@@ -77,8 +78,11 @@ class server:
                 except:
                     print(traceback.format_exc())
                 return [oldSettings["ip"], oldSettings["interface"]]
-                
-            os.system("ping " + oldSettings["ip"] + " -n 1")
+            
+            try:
+                os.system("ping " + oldSettings["ip"] + " -n 1")
+            except:
+                print("Old settings file corrupted.")
             try:
                 print("Attempting to connect to last known ip address " + oldSettings["ip"] + "...")
                 # pytools.net.getJsonAPI("http://" + oldSettings["interface"] + ":4507?json=" + urllib.parse.quote(json.dumps({
@@ -277,6 +281,9 @@ class configure:
             # if clock:
                 # if fireplace:
                     # if window:
+                    
+            print(outFinal)
+                    
             soundOutputs = {
                 "clock": [outFinal[0]["name"], "MME"], # ["VoiceMeeter Input (VB-Audio Voi", "MME"],
                 "fireplace": [outFinal[1]["name"], "MME"], # ["VoiceMeeter Aux Input (VB-Audio", "MME"],
@@ -698,7 +705,34 @@ class configure:
             except:
                 print(traceback.format_exc())
                 time.sleep(1)
+
+class vbanStream:
+    def __init__(self, speakerType):
+        self.speakerType = speakerType
+        self.previousReceive = False
+        self.previousSend = False
+        
+    def killProcess(self):
+        os.system("taskkill /f /im vbanStream_" + self.speakerType + ".exe")
     
+    def startProcess(self, clients):
+        os.system("copy \"" + sys.executable + "\" \""  + "\\".join(sys.executable.split("\\")[:-1]) + "\\vbanStream_" + self.speakerType + ".exe\" /y")
+        os.system("copy \"C:\\Windows\\py.exe\" \".\\vbanStream_" + self.speakerType + ".exe\" /y")
+        os.system("start /min \"\" \".\\vbanStream_" + self.speakerType + ".exe\" vban_stream.py --run --clients=" + str(clients[0]) + "," + str(clients[1]) + " --speakerType=" + self.speakerType + " --hostname=" + server.hostname) 
+        
+    def updateClients(self, clients):
+        
+        if clients[1] != self.previousSend:
+            self.killProcess()
+            self.startProcess(clients)
+            self.previousReceive = clients[0]
+            self.previousSend = clients[1]
+        
+        if (clients[0] != self.previousReceive) and (self.previousReceive == False):
+            self.killProcess()
+            self.startProcess(clients)
+            self.previousReceive = clients[0]
+            self.previousSend = clients[1]
 
 class streams:
 
@@ -716,6 +750,60 @@ class streams:
         streams.hasExited = False
 
     def handler():
+        clients = configure.vban.getDaisyChain()
+        clientsOld = clients
+
+        if flags.manualReturn:
+            clients[1] = flags.manualReturn
+        
+        streamClock = vbanStream("clock")
+        streamFireplace = vbanStream("fireplace")
+        streamWindow = vbanStream("window")
+        streamOutside = vbanStream("outside")
+        streamPorch = vbanStream("porch")
+        streamGeneric = vbanStream("generic")
+        streamLight = vbanStream("light")
+        
+        streamClock.updateClients(clients)
+        streamFireplace.updateClients(clients)
+        streamWindow.updateClients(clients)
+        streamOutside.updateClients(clients)
+        streamPorch.updateClients(clients)
+        streamGeneric.updateClients(clients)
+        streamLight.updateClients(clients)
+        
+        exitf = False
+        
+        while (not flags.restart) and (not exitf) and not (streams.exitf):
+            streams.isRunning = True
+            
+            clients = configure.vban.getDaisyChain()
+            
+            if flags.manualReturn:
+                clients[1] = flags.manualReturn
+            
+            streamClock.updateClients(clients)
+            streamFireplace.updateClients(clients)
+            streamWindow.updateClients(clients)
+            streamOutside.updateClients(clients)
+            streamPorch.updateClients(clients)
+            streamGeneric.updateClients(clients)
+            streamLight.updateClients(clients)
+            time.sleep(1)
+        
+        streamClock.killProcess()
+        streamFireplace.killProcess()
+        streamWindow.killProcess()
+        streamOutside.killProcess()
+        streamPorch.killProcess()
+        streamGeneric.killProcess()
+        streamLight.killProcess()
+        
+        streams.isRunning = False
+        streams.hasExited = True
+            
+
+    def handlerOld():
         streams.exitf = False
         streams.isRunning = True
         
@@ -865,25 +953,25 @@ class streams:
                 
                     audio.tools.setOutputs()
 
-                    streamClock.setReceiveFromIp(clients[0])
+                    # streamClock.setReceiveFromIp(clients[0])
                     streamClock.setSendToIp(clients[1])
                     
-                    streamFireplace.setReceiveFromIp(clients[0])
+                    # streamFireplace.setReceiveFromIp(clients[0])
                     streamFireplace.setSendToIp(clients[1])
 
-                    streamWindow.setReceiveFromIp(clients[0])
+                    # streamWindow.setReceiveFromIp(clients[0])
                     streamWindow.setSendToIp(clients[1])
                     
-                    streamOutside.setReceiveFromIp(clients[0])
+                    # streamOutside.setReceiveFromIp(clients[0])
                     streamOutside.setSendToIp(clients[1])
                     
-                    streamPorch.setReceiveFromIp(clients[0])
+                    # streamPorch.setReceiveFromIp(clients[0])
                     streamPorch.setSendToIp(clients[1])
                     
-                    streamGeneric.setReceiveFromIp(clients[0])
+                    # streamGeneric.setReceiveFromIp(clients[0])
                     streamGeneric.setSendToIp(clients[1])
                     
-                    streamLight.setReceiveFromIp(clients[0])
+                    # streamLight.setReceiveFromIp(clients[0])
                     streamLight.setSendToIp(clients[1])
 
                     clientsOld = clients

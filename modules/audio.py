@@ -110,6 +110,15 @@ def exception_handler(exc_type, exc_value, exc_traceback):
 if __name__ == '__main__':
     sys.excepthook = exception_handler
 
+def getFlag(flagName):
+    if os.path.exists(".\\" + flagName + ".derp"):
+        try:
+            return float(pytools.IO.getFile(".\\" + flagName + ".derp"))
+        except:
+            return True
+    
+    return False
+
 class pytools:
     class clock:
         def getDateTime(utc = False):
@@ -467,6 +476,8 @@ class stream:
             import math
             loopTic = 0
             import numpy
+            import pydub
+            
             import sounddevice as sd
             self.audioStream.start()
             def audioSegmentNumPy(audio):
@@ -479,12 +490,20 @@ class stream:
                 if (self.chunks != True) and (self.chunks != False):
                     def forChunkMapFunction(chunk):
                         if chunk:
+                            if self.i == 0:
+                                info.globalSoundStart = time.time()
+                                self.startPlayed = round(time.time() * 1000000)
                             timeingInfo = ((info.globalSoundStart + self.i) - time.time())
                             if timeingInfo > 0.005:
                                 intenseSleep(timeingInfo)
+                                self.audioStream.write(audioSegmentNumPy(chunk))
                             elif timeingInfo < -0.005:
-                                info.globalSoundStart = info.globalSoundStart + math.fabs(timeingInfo)
-                            self.audioStream.write(audioSegmentNumPy(chunk))
+                                # doSkip = True # info.globalSoundStart = info.globalSoundStart + math.fabs(timeingInfo)
+                                if timeingInfo > -(globals.chunkSize / 1000):
+                                    sampleDuration = chunk[0:100].duration_seconds / 100
+                                    self.audioStream.write(audioSegmentNumPy(chunk[int(math.fabs(timeingInfo) / sampleDuration):]))
+                            else:
+                                self.audioStream.write(audioSegmentNumPy(chunk))
                         else:
                             if log.debug:
                                 log.crash("Chunked Buffer Overflow!")
@@ -492,7 +511,7 @@ class stream:
                     list(map(forChunkMapFunction, self.chunks))
                 else:
                     if log.debug:
-                        log.crash("Buffer Overflow! No more input.")
+                        log.crash("Buffer Overflow!")
                     time.sleep(0.1)
             
             self.audioStream.stop()
@@ -533,21 +552,24 @@ class soundEvent:
 
         if muteOptions:
             self.muteFlag = muteOptions["flag_name"]
-            self.muteBoolModifier = muteOptions["do_mute"]
+            self.booleanValueToMuteOn = muteOptions["do_mute"]
             self.doMuteFade = muteOptions["fade"]
-            if not os.path.exists(".\\" + self.muteFlag + ".derp") and not self.muteBoolModifier:
-                self.isMuted = False
-                self.muteState = True
-            elif os.path.exists(".\\" + self.muteFlag + ".derp") and self.muteBoolModifier:
-                self.isMuted = False
-                self.muteState = True
+            
+            if getFlag(self.muteFlag) and self.booleanValueToMuteOn:
+                self.muteState = (1 - getFlag(self.muteFlag)) * 99
+            elif (not getFlag(self.muteFlag)) and (not self.booleanValueToMuteOn):
+                self.muteState = 0
             else:
-                self.isMuted = True
-                self.muteState = False
+                if self.booleanValueToMuteOn:
+                    self.muteState = (1 - getFlag(self.muteFlag)) * 99
+                else:
+                    self.muteState = getFlag(self.muteFlag) * 99
+            
+            self.previousMuteState = self.muteState
+            
         else:
-            self.isMuted = True
             self.muteFlag = "no_flag"
-            self.muteBoolModifier = True
+            self.booleanValueToMuteOn = True
             self.doMuteFade = False
             self.muteState = False
             
@@ -660,33 +682,31 @@ class soundEvent:
         import os
         
         if self.muteFlag != "no_flag":
-            if not os.path.exists(".\\" + self.muteFlag + ".derp") and not self.muteBoolModifier:
-                self.muteState = True
-            elif os.path.exists(".\\" + self.muteFlag + ".derp") and self.muteBoolModifier:
-                self.muteState = True
+            if getFlag(self.muteFlag) and self.booleanValueToMuteOn:
+                self.muteState = (1 - getFlag(self.muteFlag)) * 99
+            elif (not getFlag(self.muteFlag)) and (not self.booleanValueToMuteOn):
+                self.muteState = 0
             else:
-                self.muteState = False
-                
-            if not self.muteState:
-                if not self.isMuted:
-                    if self.doMuteFade:
-                        if globals.chunkSize < 4096:
-                            self.data = self.data.fade_in(globals.chunkSize * 1000)
-                        else:
-                            self.data = self.data.fade_in(4096)
-                    self.isMuted = True
-            else:
-                if self.isMuted:
-                    if self.doMuteFade:
-                        if globals.chunkSize < 4096:
-                            self.data = self.data.fade_out(globals.chunkSize * 1000)
-                        else:
-                            self.data = self.data.fade_out(4096)
-                    else:
-                        self.data = self.data - 100
-                    self.isMuted = False
+                if self.booleanValueToMuteOn:
+                    self.muteState = (1 - getFlag(self.muteFlag)) * 99
                 else:
-                    self.data = self.data - 100
+                    self.muteState = getFlag(self.muteFlag) * 99
+                
+            if self.muteState != self.previousMuteState:
+                if self.doMuteFade:
+                    if globals.chunkSize < 4096:
+                        self.data = self.data.fade(from_gain=(20 * math.log((self.previousMuteState + 0.01) / 100, 10)), start=0, duration=globals.chunkSize)
+                        self.data = self.data.fade(to_gain=(20 * math.log((self.muteState + 0.01) / 100, 10)), start=0, duration=globals.chunkSize)
+                        self.previousMuteState = self.muteState
+                    else:
+                        self.data = self.data.fade(from_gain=(20 * math.log((self.previousMuteState + 0.01) / 100, 10)), start=0, duration=4096)
+                        self.data = self.data.fade(to_gain=(20 * math.log((self.muteState + 0.01) / 100, 10)), start=0, duration=4096)
+                        self.previousMuteState = self.muteState
+                else:
+                    self.data = self.data + (20 * math.log((self.muteState + 0.01) / 100, 10))
+                    self.previousMuteState = self.muteState
+            else:
+                self.data = self.data + (20 * math.log((self.muteState + 0.01) / 100, 10))
             
         if self.balence != 0:
             monoSets = self.data.split_to_mono()

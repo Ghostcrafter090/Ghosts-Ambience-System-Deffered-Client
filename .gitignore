@@ -33,3 +33,5 @@ hosts.json
 plugOutputs.json
 logs/
 stream_buffer_underrun
+old/*
+old

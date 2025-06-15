@@ -8,6 +8,7 @@ import time
 import threading
 import random
 import psutil
+import math
 
 from .. import VBANAudioHeader
 from ..const import *
@@ -75,7 +76,7 @@ class VBAN_Sender:
             self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self._socket.connect(self._receiver)
 
-            self._samples_per_frame = 192
+            self._samples_per_frame = 256
 
             try:
 
@@ -133,7 +134,7 @@ class VBAN_Sender:
         allf.senderUUIDs[self._uuid][0] = time.time()
         self._uuidTimestampOld = allf.senderUUIDs[self._uuid][0]
 
-    def _run_once_send(self, inArray):
+    def _run_once_send(self, inArray, startRead):
         try:
 
             header = VBANAudioHeader(
@@ -143,7 +144,7 @@ class VBAN_Sender:
                 format=VBANBitResolution.VBAN_BITFMT_16_INT,
                 codec=VBANCodec.VBAN_CODEC_PCM,
                 stream_name=self._stream_name,
-                frame_counter=self._frame_counter,
+                frame_counter=int(math.floor((startRead * self._sample_rate) / self._samples_per_frame)),
             )
 
             data = header.to_bytes() + inArray
@@ -159,7 +160,7 @@ class VBAN_Sender:
         
         except Exception as e:
             if inArray: 
-                allf.streamBuffers[self._uuid].append(inArray)
+                allf.streamBuffers[self._uuid].append([inArray, int(math.floor((startRead * self._sample_rate) / self._samples_per_frame))])
 
             errorString = f"An exception occurred: {e}"
             if self.previousError != errorString:
@@ -197,12 +198,13 @@ class VBAN_Sender:
         self.run_once_sec0()
 
         try:
+            streamTime = time.monotonic()
             
             inArray = self._stream.read(self._samples_per_frame)[0].tobytes()
             if threading.active_count() < getCpuCount() * 2:
-                threading.Thread(target=self._run_once_send, args=(inArray,)).start()
+                threading.Thread(target=self._run_once_send, args=(inArray, streamTime,)).start()
             else:
-                self._run_once_send(inArray)
+                self._run_once_send(inArray, streamTime)
 
         except Exception as e:
             errorString = f"An exception occurred: {e}"
@@ -241,10 +243,10 @@ class VBAN_Sender:
                     format=VBANBitResolution.VBAN_BITFMT_16_INT,
                     codec=VBANCodec.VBAN_CODEC_PCM,
                     stream_name=self._stream_name,
-                    frame_counter=self._frame_counter,
+                    frame_counter=allf.streamBuffers[self._uuid][0][1],
                 )
                 
-                data = header.to_bytes() + allf.streamBuffers[self._uuid][0]
+                data = header.to_bytes() + allf.streamBuffers[self._uuid][0][0]
                 data = data[:VBAN_PROTOCOL_MAX_SIZE]
 
                 self._socket.sendto(data, self._receiver)

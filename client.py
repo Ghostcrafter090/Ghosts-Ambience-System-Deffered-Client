@@ -19,6 +19,7 @@ import os
 import threading
 import random
 import math
+import pythoncom
 
 import wmi
 import psutil
@@ -285,7 +286,15 @@ class soundRegister:
     cpuUsage = 70
     
     maxCPUUsage = 95
-    CPUUsageThreshold = 95
+    CPUUsageThreshold = {
+        "StreamClock": 95,
+        "StreamFireplace": 95,
+        "StreamWindow": 95,
+        "StreamOutside": 95,
+        "StreamPorch": 95,
+        "StreamGeneric": 95,
+        "StreamLight": 95,
+    }
     lastCPUThresholdAdd = time.time()
     
     receiverBufferErrorCounter = 0
@@ -331,14 +340,19 @@ class soundRegister:
                                 "command": "clientMessage",
                                 "data": {
                                     "to": vm.configure.vban.getDaisyChain()[0],
-                                    "message": "bufferUnderrun"
+                                    "message": "bufferUnderrun",
+                                    "stream": pytools.IO.getFile("stream_buffer_underrun")
                                 }
                             })))
                             os.system("del stream_buffer_underrun /f /q")
                     except:
                         print(traceback.format_exc())
                     soundRegister.soundCount = puppet.getSoundCount()
-                    if (soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and (soundRegister.lastAddCount < 3) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold):
+                    
+                    eventBytes = json.loads(pytools.cipher.base64_decode(soundRegister.buffer[i][0]))
+                    streamType = "Stream" + eventBytes["events"][0]["channel"][0].upper() + eventBytes["events"][0]["channel"][1:]
+                    
+                    if (soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and (soundRegister.lastAddCount < 3) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType]):
                         soundRegister.lastAddCount = soundRegister.lastAddCount + 1
                         puppet.fireEvent(*soundRegister.buffer[i], fromBuffer=True)
                         soundRegister.buffer.pop(i)
@@ -373,9 +387,10 @@ class soundRegister:
                 soundRegister.lastAddCount = 0
             
             if (soundRegister.lastCPUThresholdAdd + 5) < time.time():
-                soundRegister.CPUUsageThreshold = soundRegister.CPUUsageThreshold + 1
-                if soundRegister.CPUUsageThreshold > soundRegister.maxCPUUsage:
-                    soundRegister.CPUUsageThreshold = soundRegister.maxCPUUsage
+                for stream in soundRegister.CPUUsageThreshold:
+                    soundRegister.CPUUsageThreshold[stream] = soundRegister.CPUUsageThreshold[stream] + 1
+                    if soundRegister.CPUUsageThreshold[stream] > soundRegister.maxCPUUsage:
+                        soundRegister.CPUUsageThreshold[stream] = soundRegister.maxCPUUsage
             
                 soundRegister.lastCPUThresholdAdd = time.time()
             
@@ -389,17 +404,19 @@ class puppet:
     def performSystemRestart():
         system.performRestart = True
     
-    def bufferUnderrun():
-        try:
-            soundRegister.CPUUsageThreshold = soundRegister.CPUUsageThreshold - 5
-            if soundRegister.CPUUsageThreshold < 0:
-                soundRegister.CPUUsageThreshold = 0
-            return True
-        except:
-            return False
+    def bufferUnderrun(stream="all"):
+        for streamType in soundRegister.CPUUsageThreshold:
+            if (stream == streamType) or (stream == "all"):
+                try:
+                    soundRegister.CPUUsageThreshold[streamType] = soundRegister.CPUUsageThreshold[streamType] - 2
+                    if soundRegister.CPUUsageThreshold[streamType] < 0:
+                        soundRegister.CPUUsageThreshold[streamType] = 0
+                    return True
+                except:
+                    return False
     
     def getCPUUsageThreshold():
-        return soundRegister.CPUUsageThreshold
+        return sum(list(soundRegister.CPUUsageThreshold.values())) / len(list(soundRegister.CPUUsageThreshold.values()))
     
     def getCPUUsage():
         return soundRegister.cpuUsage
@@ -414,7 +431,9 @@ class puppet:
         except:
             pass
         if soundRegister.maxSoundCount == -1:
+            puppet.suspendEvents()
             soundRegister.maxSoundCount = (tools.benchmark.getNumberOfPlugins(tools.benchmark.get())) + puppet.getSoundCount()
+            puppet.unsuspendEvents()
         return soundRegister.maxSoundCount
     
     def getSoundCount(addBuffer=False):
@@ -459,7 +478,11 @@ class puppet:
                 duration = float(WAVE(".\\sound\\assets\\" + pathf).info.length) / speedf
         except:
             pass
-        if (duration > 240) or ((soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold)):
+        
+        eventData = json.loads(pytools.cipher.base64_decode(eventBytes))
+        streamType = "Stream" + eventData["events"][0]["channel"][0].upper() + eventData["events"][0]["channel"][1:]
+        
+        if (duration > 240) or ((soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType])):
             print("Audio events received.")
             if not flags.restart:
                 if fileData:
@@ -467,7 +490,6 @@ class puppet:
                         pytools.IO.saveBytes(".\\sound\\assets\\" + fileData["fileName"].split(";")[0], pytools.cipher.base64_decode(fileData["data"], isBytes=True))
                     except:
                         print(traceback.format_exc())
-                eventData = json.loads(pytools.cipher.base64_decode(eventBytes))
                 i = 0
                 while i < len(eventData["events"]):
                     eventData["events"][i]["path"] = eventData["events"][i]["path"].replace("\\working\\", "\\")
@@ -498,7 +520,7 @@ class puppet:
     def generateFlag(flagName, bool):
         print("Setting flag " + str(flagName) + " to " + str(bool) + "...")
         if bool:
-            pytools.IO.saveFile(flagName + ".derp", "")
+            pytools.IO.saveFile(flagName + ".derp", str(bool))
         else:
             os.system("del \"" + flagName + ".derp\" /f /q")
 
@@ -508,10 +530,14 @@ class puppet:
         os.system("taskkill /f /im ambience.exe")
         
     def suspendEvents():
+        pythoncom.CoInitialize()
         print("Suspending events...")
         f = wmi.WMI()
         for process in f.Win32_Process():
             if process.name == "ambience.exe":
+                p = psutil.Process(process.ProcessId)
+                p.suspend()
+            if "vbanStream_" in process.name:
                 p = psutil.Process(process.ProcessId)
                 p.suspend()
                 
@@ -527,9 +553,13 @@ class puppet:
         
     def unsuspendEvents():
         print("Unsuspending events...")
+        pythoncom.CoInitialize()
         f = wmi.WMI()
         for process in f.Win32_Process():
             if process.name == "ambience.exe":
+                p = psutil.Process(process.ProcessId)
+                p.resume()
+            if "vbanStream_" in process.name:
                 p = psutil.Process(process.ProcessId)
                 p.resume()
 
@@ -596,10 +626,16 @@ class com:
                         "maxSoundCount": puppet.getMaxSoundCount()
                     }), "utf-8"))
                 if request["command"] == "bufferUnderrun":
-                    successEvent = puppet.bufferUnderrun()
-                    self.wfile.write(bytes(json.dumps({
-                        "status": ("success" * successEvent) + ("failed" * (not successEvent))
-                    }), "utf-8"))
+                    if ("data" in request) and ("stream" in request["data"]):
+                        successEvent = puppet.bufferUnderrun(stream=request["data"]["stream"])
+                        self.wfile.write(bytes(json.dumps({
+                            "status": ("success" * successEvent) + ("failed" * (not successEvent))
+                        }), "utf-8"))
+                    else:
+                        successEvent = puppet.bufferUnderrun()
+                        self.wfile.write(bytes(json.dumps({
+                            "status": ("success" * successEvent) + ("failed" * (not successEvent))
+                        }), "utf-8"))
                 if request["command"] == "performFullRestart":
                     successEvent = puppet.performSystemRestart()
                     self.wfile.write(bytes(json.dumps({

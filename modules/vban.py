@@ -106,13 +106,17 @@ class vbanTransmitterThread:
         self.toIp = toIp
         self.deviceIndex = deviceIndex
         
+        channels = sd.query_devices()[util.getInputs()[speakerType][2]]["max_input_channels"]
+        if channels > 2:
+            channels = 2
+        
         if not manualPort:
             self.vbanObj = pyvban.utils.VBAN_Sender(
                 receiver_ip=toIp,
                 receiver_port=util.ports[speakerType],
                 stream_name="Stream" + speakerType[0].upper() + speakerType[1:],
                 sample_rate=48000,
-                channels=sd.query_devices()[util.getInputs()[speakerType][2]]["max_input_channels"],
+                channels=channels,
                 # channels=pyaudio.PyAudio().get_device_info_by_index(util.getInputs()[speakerType][2])["maxInputChannels"],
                 device_index=util.getInputs()[speakerType][2]
             )
@@ -122,7 +126,7 @@ class vbanTransmitterThread:
                 receiver_port=manualPort,
                 stream_name="Stream" + speakerType[0].upper() + speakerType[1:],
                 sample_rate=48000,
-                channels=sd.query_devices()[util.getInputs()[speakerType][2]]["max_input_channels"],
+                channels=channels,
                 # channels=pyaudio.PyAudio().get_device_info_by_index(util.getInputs()[speakerType][2])["maxInputChannels"],
                 device_index=util.getInputs()[speakerType][2]
             )
@@ -148,7 +152,7 @@ class vbanTransmitterThread:
     def start(self):
         if not (self.isRunning and self.hasStopped):
             self.thread.start()
-        print("Stream has already been started.")
+        print("Transmitter stream has already been started.")
 
     def stop(self):
         self.vbanObj.stop()
@@ -199,7 +203,7 @@ class vbanReceiverThread:
         if not (self.isRunning and self.hasStopped):
             self.thread.start()
         else:
-            print("Stream has already been started.")
+            print("Receive stream has already been started.")
 
     def stop(self):
         self.vbanObj.stop()
@@ -297,7 +301,8 @@ class speaker:
                                 "isRunning": self.receiverThread.isRunning,
                                 "hasStopped": self.receiverThread.hasStopped,
                                 "lastActivityTimestamp": int(self.receiverThread.vbanObj.lastActivityTimestamp / 10) * 10,
-                                "currentBufferSize": len(self.receiverThread.vbanObj.packetBuffer)
+                                "currentBufferSize": len(self.receiverThread.vbanObj.packetBuffer),
+                                "lastReceived": int(self.receiverThread.vbanObj.lastReceived)
                             },
                             "transmitter": {
                                 "deviceIndex": self.transmitterThread.deviceIndex,
@@ -320,7 +325,8 @@ class speaker:
                                 "deviceIndex": None,
                                 "isRunning": False,
                                 "hasStopped": False,
-                                "currentBufferSize": 0
+                                "currentBufferSize": 0,
+                                "lastReceived": 0
                             },
                             "transmitter": {
                                 "deviceIndex": self.transmitterThread.deviceIndex,
@@ -343,7 +349,8 @@ class speaker:
                                 "isRunning": False,
                                 "hasStopped": False,
                                 "lastActivityTimestamp": 0,
-                                "currentBufferSize": 0
+                                "currentBufferSize": 0,
+                                "lastReceived": 0
                             },
                             "transmitter": {
                                 "deviceIndex": None,
@@ -369,6 +376,7 @@ class speaker:
                 if (speakerTypeOld != self.speakerType):
                     print("Settings Modified!")
                     speakerTypeOld = copy.deepcopy(self.speakerType)
+                    print(self.receiveFrom)
                     receiveFromOld = copy.deepcopy(self.receiveFrom)
                     sendToOld = copy.deepcopy(self.sendTo)
                     
@@ -392,10 +400,10 @@ class speaker:
                 print(traceback.format_exc())
 
             try:
-                if (self.transmitterThread.vbanObj.lastActivityTimestamp + 20) < time.time():
-                    self.settingsModified()
+                if (self.transmitterThread.vbanObj.lastActivityTimestamp + 30) < time.time():
+                    self.settingsModified(doOnlyTransmit=True)
             except:
-                self.settingsModified()
+                self.settingsModified(doOnlyTransmit=True)
                 print(traceback.format_exc())
 
             self.lastUpdated = time.time()
