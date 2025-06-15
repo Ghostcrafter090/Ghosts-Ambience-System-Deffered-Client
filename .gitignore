@@ -35,3 +35,6 @@ logs/
 stream_buffer_underrun
 old/*
 old
+ambience.exe
+ambience_client.exe
+modules\audio_event.py

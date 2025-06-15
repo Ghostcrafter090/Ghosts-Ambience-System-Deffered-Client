@@ -45,15 +45,6 @@ class util:
                 "light": ["", "MME"]
             }
             
-            # try:
-            #     extras = pytools.IO.getJson("extraOutputs.json")["list"]
-            # except:
-            #     extras = []
-            # 
-            # if extras != []:
-            #     for extra in extras:
-            #         soundInputs[extra] = ["", "MME"]
-            
             sortedKey = []
             
             for output in outputs:
@@ -117,7 +108,6 @@ class vbanTransmitterThread:
                 stream_name="Stream" + speakerType[0].upper() + speakerType[1:],
                 sample_rate=48000,
                 channels=channels,
-                # channels=pyaudio.PyAudio().get_device_info_by_index(util.getInputs()[speakerType][2])["maxInputChannels"],
                 device_index=util.getInputs()[speakerType][2]
             )
         else:
@@ -127,7 +117,6 @@ class vbanTransmitterThread:
                 stream_name="Stream" + speakerType[0].upper() + speakerType[1:],
                 sample_rate=48000,
                 channels=channels,
-                # channels=pyaudio.PyAudio().get_device_info_by_index(util.getInputs()[speakerType][2])["maxInputChannels"],
                 device_index=util.getInputs()[speakerType][2]
             )
             self.vbanObj.sendingToVoicemeeter = True

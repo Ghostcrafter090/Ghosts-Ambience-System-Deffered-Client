@@ -605,8 +605,6 @@ class com:
             jsonRequest = urllib.parse.parse_qs(urllib.parse.unquote_plus(request))
             print(jsonRequest)
             return json.loads(jsonRequest["/?json"][0])
-            # print("\"" + jsonRequest + "\"")
-            # return json.loads(jsonRequest)
 
     class MyServer(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -726,16 +724,10 @@ class com:
         threads.threadHttp = threading.Thread(target=com.start)
         threads.soundHandler = threading.Thread(target=soundRegister.run)
         threads.vbanHandler = threading.Thread(target=vm.streams.handler)
-        # threads.threadVoicemeeter = threading.Thread(target=vm.vm.handler)
-        # threads.threadVoicemeeterFixer = threading.Thread(target=vm.vm.fixStatus)
-        # threads.threadVConfigure = threading.Thread(target=vm.configure.handler)
 
         threads.vbanHandler.start()
         threads.threadHttp.start()
         threads.soundHandler.start()
-        # threads.threadVoicemeeter.start()
-        # threads.threadVoicemeeterFixer.start()
-        # threads.threadVConfigure.start()
         
         threads.threadSleepHandler = threading.Thread(target=system.sleepHandler)
         threads.threadSleepHandler.start()

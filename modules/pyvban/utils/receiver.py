@@ -103,19 +103,11 @@ class VBAN_Receiver:
             self._socket.bind(("0.0.0.0", port))
             self._port = port
 
-            self._p = False # pyaudio.PyAudio()
+            self._p = False
             self._current_pyaudio_config = {
                 "channels": 2,
                 "rate": 48000
             }
-            
-            # self._stream = self._p.open(
-            #     format=self._p.get_format_from_width(2), 
-            #     channels=self._current_pyaudio_config["channels"],
-            #     rate=self._current_pyaudio_config["rate"],
-            #     output=True,
-            #     output_device_index=self._device_index
-            # )
 
             self._stream = sd.OutputStream(
             dtype='int16',
@@ -178,9 +170,6 @@ class VBAN_Receiver:
                 if packet.header.stream_name != self._stream_name:
                     self._logger.debug(f"Unexpected stream name \"{packet.header.stream_name}\" != \"{self._stream_name}\"")
                     return
-                # if addr[0] != self._sender_ip:
-                #     self._logger.debug(f"Unexpected sender \"{addr[0]}\" != \"{self._sender_ip}\"")
-                #     return
 
                 self._check_pyaudio(packet.header)
 
@@ -207,9 +196,7 @@ class VBAN_Receiver:
                     self._socket.close()
                 except:
                     print("Unnable to close socket.")
-                    
-                # self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                # self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
                 self._socket.bind(("0.0.0.0", self._port))
 
     def run(self):
@@ -306,7 +293,6 @@ class VBAN_Receiver:
             self._socket.close()
         except:
             print("Unnable to close socket.")
-        # self._stream = None
 
 if __name__ == "__main__":
     import argparse
