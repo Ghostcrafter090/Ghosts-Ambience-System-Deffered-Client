@@ -290,7 +290,7 @@ class speaker:
                                 "isRunning": self.receiverThread.isRunning,
                                 "hasStopped": self.receiverThread.hasStopped,
                                 "lastActivityTimestamp": int(self.receiverThread.vbanObj.lastActivityTimestamp / 10) * 10,
-                                "currentBufferSize": len(self.receiverThread.vbanObj.packetBuffer),
+                                "currentBufferSize": len(pyvban.utils.receiver.allf.packetBuffers[self.receiverThread.vbanObj._stream_name]),
                                 "lastReceived": int(self.receiverThread.vbanObj.lastReceived)
                             },
                             "transmitter": {
@@ -298,7 +298,9 @@ class speaker:
                                 "isRunning": self.transmitterThread.isRunning,
                                 "hasStopped": self.transmitterThread.hasStopped,
                                 "lastActivityTimestamp": int(self.transmitterThread.vbanObj.lastActivityTimestamp / 10) * 10,
-                                "currentBufferSize": len(self.transmitterThread.vbanObj.streamBuffer),
+                                "currentBufferSize": len(self.transmitterThread.vbanObj.arrayBuffer),
+                                "sendingLatency": self.transmitterThread.vbanObj.packetTime,
+                                "senderThreadCount": pyvban.utils.sender.allf.threadCount,
                                 "sendingToVoicemeeter": self.transmitterThread.vbanObj.sendingToVoicemeeter
                             }
                         },
@@ -322,7 +324,9 @@ class speaker:
                                 "isRunning": self.transmitterThread.isRunning,
                                 "hasStopped": self.transmitterThread.hasStopped,
                                 "lastActivityTimestamp": int(self.transmitterThread.vbanObj.lastActivityTimestamp / 10) * 10,
-                                "currentBufferSize": len(self.transmitterThread.vbanObj.streamBuffer),
+                                "currentBufferSize": len(self.transmitterThread.vbanObj.arrayBuffer),
+                                "sendingLatency": self.transmitterThread.vbanObj.packetTime,
+                                "senderThreadCount": pyvban.utils.sender.allf.threadCount,
                                 "sendingToVoicemeeter": self.transmitterThread.vbanObj.sendingToVoicemeeter
                             }
                         },
@@ -347,6 +351,8 @@ class speaker:
                                 "hasStopped": False,
                                 "lastActivityTimestamp": 0,
                                 "currentBufferSize": 0,
+                                "sendingLatency": 0,
+                                "senderThreadCount": 0,
                                 "sendingToVoicemeeter": False
                             }
                         },

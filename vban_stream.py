@@ -5,6 +5,7 @@ import modules.vban as vban
 
 import sys
 import time
+import subprocess
 
 class streams:
     vbanStream = False
@@ -20,6 +21,7 @@ def setup(speakerType, clients, serverHostname):
     streams.vbanStream.serverHostname = serverHostname
     
 def run():
+    
     streams.vbanStream.run()
     while True:
         print("Handler is alive.")

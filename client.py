@@ -352,7 +352,7 @@ class soundRegister:
                     eventBytes = json.loads(pytools.cipher.base64_decode(soundRegister.buffer[i][0]))
                     streamType = "Stream" + eventBytes["events"][0]["channel"][0].upper() + eventBytes["events"][0]["channel"][1:]
                     
-                    if (soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and (soundRegister.lastAddCount < 3) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType]):
+                    if (soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and (soundRegister.lastAddCount < 3) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType]) and (soundRegister.cpuUsage < (sum(list(soundRegister.CPUUsageThreshold.values())) / len(soundRegister.CPUUsageThreshold))):
                         soundRegister.lastAddCount = soundRegister.lastAddCount + 1
                         puppet.fireEvent(*soundRegister.buffer[i], fromBuffer=True)
                         soundRegister.buffer.pop(i)
@@ -408,7 +408,7 @@ class puppet:
         for streamType in soundRegister.CPUUsageThreshold:
             if (stream == streamType) or (stream == "all"):
                 try:
-                    soundRegister.CPUUsageThreshold[streamType] = soundRegister.CPUUsageThreshold[streamType] - 2
+                    soundRegister.CPUUsageThreshold[streamType] = soundRegister.CPUUsageThreshold[streamType] - 14
                     if soundRegister.CPUUsageThreshold[streamType] < 0:
                         soundRegister.CPUUsageThreshold[streamType] = 0
                     return True
@@ -482,7 +482,7 @@ class puppet:
         eventData = json.loads(pytools.cipher.base64_decode(eventBytes))
         streamType = "Stream" + eventData["events"][0]["channel"][0].upper() + eventData["events"][0]["channel"][1:]
         
-        if (duration > 240) or ((soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType])):
+        if (duration > 240) or ((soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType]) and (soundRegister.cpuUsage < (sum(list(soundRegister.CPUUsageThreshold.values())) / len(soundRegister.CPUUsageThreshold)))):
             print("Audio events received.")
             if not flags.restart:
                 if fileData:
