@@ -430,7 +430,7 @@ class soundRegister:
                         fapperWatchCountInBuffer = fapperWatchCountInBuffer + 1
                     
                     if (soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and (soundRegister.lastAddCount < math.ceil(soundRegister.maxSoundCount / 23)) and (((soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType])) or ((fapperWatchCountInBuffer > 7) and ("high_pitch.mp3" in soundName))) and (soundRegister.cpuUsage < (sum(list(soundRegister.CPUUsageThreshold.values())) / len(soundRegister.CPUUsageThreshold))) and (not os.path.exists("stopEventFiring.derp")) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)):
-                        soundRegister.lastAddCount = soundRegister.lastAddCount + 1
+                        soundRegister.lastAddCount = soundRegister.lastAddCount + (1 * ((flags.isHelper * 10) + 1))
                         if puppet.fireEvent(*soundRegister.buffer[i], fromBuffer=True, ignoreSpeakerCPU=((fapperWatchCountInBuffer > 7) and ("high_pitch.mp3" in soundName))):
                             soundRegister.buffer.pop(i)
                             i = i - 1

@@ -7,7 +7,12 @@ p = psutil.Process(os.getpid())
 oldAffinity = p.cpu_affinity()
 oldPriority = p.nice()
 p.cpu_affinity([random.randint(0, psutil.cpu_count() - 1)])
-p.nice(psutil.IDLE_PRIORITY_CLASS)
+if __name__ == "__main__":
+    p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+    print("Setting below normal priority...")
+else:
+    p.nice(psutil.IDLE_PRIORITY_CLASS)
+    print("Setting low priority...")
 import sounddevice as sd
 import pickle
 import shutil
