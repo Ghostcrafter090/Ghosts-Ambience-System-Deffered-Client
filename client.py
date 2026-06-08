@@ -5,9 +5,17 @@ import modules.logManager as log
 
 import vm
 
-from http import HTTPStatus
+from flask import Response
+from flask import Flask, request
+from flask import render_template
+from flask import current_app
+from flask_cors import CORS, cross_origin
+from flask import Flask, jsonify, request
+from flask import send_from_directory
+from werkzeug.serving import make_server
+from flask import Flask, redirect, url_for
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import socket
 import urllib.parse
 import json
 
@@ -71,54 +79,49 @@ class util:
         m = (1.11 * (((((math.fabs(z_1 )) / (2)) + 15) / (15)) ** (1) * (a * e ** ( - 0.65 * (((w - b) ** (2)) / (c))))) + (h * e ** ( - 0.65 * (((w - b) ** (2)) / (g))))) + j + k + (2 * (l_2 + l_3 + l_4 + l_5 + l_6 + l_7 + l_8 + l_9 + l_10 + l_11 + l_12 + l_13)) + o + t + z - 40
         n = - 10 * math.sin(((p) / (12 * 60 * 60)) * (w - 6 * 60 * 60))
         z_2 = ((1) / (2)) * (n * (((m) / (10))) + m)
+        
+        if timeStamp < (pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()) + 10):
+        
+            try:
+                ogValue = max(pytools.net.getJsonAPI("http://" + vm.server.hostname + ":" + str(random.randint(6000, 6029)) + "?json=" + urllib.parse.quote(json.dumps({
+                    "command": "getJson",
+                    "data": {
+                        "path": ".\\working\\hallowForecastHourly.json"
+                    }
+                })), timeout=1)["data"])
+            except:
+                ogValue = 0
+        
+        else:
+            ogValue = -1000
+        
         if noDay:
+            if ogValue > m:
+                return ogValue
             return m
         else:
+            if ogValue > z_2:
+                return ogValue
             return z_2
 
-def handle_one_request(self: BaseHTTPRequestHandler):
-    """Handle a single HTTP request.
-
-    You normally don't need to override this method; see the class
-    __doc__ string for information on how to handle specific HTTP
-    commands such as GET and POST.
-
-    """
-    try:
-        self.raw_requestline = self.rfile.readline(524289)
-        if len(self.raw_requestline) > 524289:
-            self.requestline = ''
-            self.request_version = ''
-            self.command = ''
-            self.send_error(HTTPStatus.REQUEST_URI_TOO_LONG)
-            return
-        if not self.raw_requestline:
-            self.close_connection = True
-            return
-        if not self.parse_request():
-            # An error code has been sent, just exit
-            return
-        mname = 'do_' + self.command
-        if not hasattr(self, mname):
-            self.send_error(
-                HTTPStatus.NOT_IMPLEMENTED,
-                "Unsupported method (%r)" % self.command)
-            return
-        method = getattr(self, mname)
-        method()
-        self.wfile.flush() #actually send the response if not already done.
-    except TimeoutError as e:
-        #a read or a write timed out.  Discard this connection
-        self.log_error("Request timed out: %r", e)
-        self.close_connection = True
-        return
-
-BaseHTTPRequestHandler.handle_one_request = handle_one_request
+class ServerThread(threading.Thread):
+    def __init__(self, app, ip, port):
+        threading.Thread.__init__(self)
+        self.server = make_server(ip, port, app, threaded=True)
+        self.ctx = app.app_context()
+        self.ctx.push()
+        
+    def run(self):
+        self.server.serve_forever()
+    
+    def shutdown(self):
+        self.server.shutdown()
 
 class flags:
     skipCompile = False
     restart = False
     manualReturn = False
+    dontResetVban = False
     
 class threads:
     threadHttp = False
@@ -128,6 +131,8 @@ class threads:
     threadSleepHandler = False
     soundHandler = False
     vbanHandler = False
+
+
 
 class powershell:
     def __init__(self, strf):
@@ -142,11 +147,46 @@ class powershell:
         os.system("del \"" + fileName + "\" /f /q")
         return out
         
+class multiThread:
+    def __init__(self, target, args=()):
+        self.thread = threading.Thread(target=self.run)
+        self.function = target
+        self.args = args
+        
+    isRunning = False
+    hasExited = False
+    returnData = False
+    
+    def start(self):
+        self.thread.start()
+    
+    def run(self):
+        self.isRunning = True
+        try:
+            self.returnData = [True, self.function(*self.args)]
+        except:
+            self.returnData = [False, traceback.format_exc()]
+        self.hasExited = True
+        self.isRunning = False
+    
+    def getReturn(self):
+        if not self.isRunning:
+            if self.hasExited:
+                if self.returnData:
+                    if self.returnData[0]:
+                        return self.returnData[1]
+                    else:
+                        print(self.returnData[1])
+                        raise self.returnData[1]
+
+        return None
 
 class system:
     
     sleepState = -1
     sleepStateCount = 0
+    
+    soundCount = 0
     
     def restartNetworkAdapters():
         print("Restarting Network Adapter...")
@@ -192,11 +232,11 @@ class system:
                     loadPercent = (load[1] / load[0]) * 100
                     print("Load Percent: " + str(loadPercent))
                     print("Current end of chain status: " + str(vm.configure.vban.getDaisyChain()[0] == False))
-                    print("Current hallowed stay on status: " + str(False == ((util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) < 45) and (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) > (util.getHallowIndex(pytools.clock.dateArrayToUTC([pytools.clock.getDateTime()[0], 12, 21, 0, 0, 0]), noDay=True))))))
+                    print("Current hallowed stay on status: " + str(False == ((util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) < 10) and (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) > (util.getHallowIndex(pytools.clock.dateArrayToUTC([pytools.clock.getDateTime()[0], 12, 21, 0, 0, 0]), noDay=True))))))
                     print("Current sleep state count: " + str(system.sleepStateCount))
-                    if (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) < 45) and (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) > (util.getHallowIndex(pytools.clock.dateArrayToUTC([pytools.clock.getDateTime()[0], 12, 21, 0, 0, 0]), noDay=True))):
+                    if (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) < 10) and (util.getHallowIndex(pytools.clock.dateArrayToUTC(pytools.clock.getDateTime()), noDay=True) > (util.getHallowIndex(pytools.clock.dateArrayToUTC([pytools.clock.getDateTime()[0], 12, 21, 0, 0, 0]), noDay=True))):
                         if loadPercent < 60:
-                            if system.sleepStateCount > 15:
+                            if system.sleepStateCount > 150:
                                 if vm.configure.vban.getDaisyChain()[0] == False:
                                     system.sleepStateCount = 0
                                     pytools.IO.saveList(".\\sleepActive.derp", "")
@@ -220,6 +260,10 @@ class system:
                         system.sleepState = True
                         system.hasDoneNightlyRestart = False
                     
+                    if (not system.sleepState) and (not vm.streams.isRunning):
+                        threads.vbanHandler = threading.Thread(target=vm.streams.handler)
+                        threads.vbanHandler.start()
+                    
                     if system.sleepState != -1:
                         if (loadPercent > 90) and (not system.performRestart):
                             os.system("del \".\\sleepActive.derp\" /f /q")
@@ -234,13 +278,18 @@ class system:
                             })))
                             if puppet.getSoundCount() <= 1:
                                 vm.streams.shutdown()
-                                system.sleepStateCount = 15
+                                system.sleepStateCount = 150
                                 pytools.IO.saveFile("wokeUp.derp", "")
                                 if system.hasDoneNightlyRestart:
                                     os.system("rundll32.exe powrprof.dll, SetSuspendState Sleep")
                                 else:
                                     os.system("shutdown /r /t 60")
                                     system.hasDoneNightlyRestart = True
+                        else:
+                            if not vm.streams.isRunning:
+                                if vm.streams.hasExited:
+                                    threads.vbanHandler = threading.Thread(target=vm.streams.handler)
+                                    threads.vbanHandler.start()
                     else:
                         try:
                             os.system("del \".\\sleepActive.derp\" /f /q")
@@ -266,7 +315,7 @@ class system:
                         })))
                         if puppet.getSoundCount() <= 1:
                             vm.streams.shutdown()
-                            system.sleepStateCount = 15
+                            system.sleepStateCount = 150
                             os.system("shutdown /r /t 60")
                             system.hasDoneNightlyRestart = True
                     else:
@@ -303,7 +352,12 @@ class soundRegister:
     lastAddRemove = 0
     
     def run():
+        soundCountThread = multiThread(target=puppet.getSoundCount)
+        soundCountThread.start()
+        fapperWatchCountInBuffer = 0
+        
         while not flags.restart:
+            # print("Sound handler looping...")
             try:
                 if os.path.exists("stream_buffer_underrun"):
                     response = pytools.net.getJsonAPI("http://" + vm.server.hostname + ":" + str(random.randint(6000, 6029)) + "?json=" + urllib.parse.quote(json.dumps({
@@ -331,7 +385,15 @@ class soundRegister:
             except:
                 print(traceback.format_exc())
             try:
-                soundRegister.soundCount = puppet.getSoundCount()
+                if soundCountThread.hasExited and (not soundCountThread.isRunning):
+                    try:
+                        soundRegister.soundCount = soundCountThread.getReturn()
+                    except:
+                        soundRegister.soundCount = soundRegister.maxSoundCount
+
+                    soundCountThread = multiThread(target=puppet.getSoundCount)
+                    soundCountThread.start()
+                
                 i = 0
                 while i < len(soundRegister.buffer):
                     try:
@@ -347,28 +409,53 @@ class soundRegister:
                             os.system("del stream_buffer_underrun /f /q")
                     except:
                         print(traceback.format_exc())
-                    soundRegister.soundCount = puppet.getSoundCount()
                     
+                    if soundCountThread.hasExited and (not soundCountThread.isRunning):
+                        try:
+                            soundRegister.soundCount = soundCountThread.getReturn()
+                        except:
+                            soundRegister.soundCount = soundRegister.maxSoundCount
+
+                        soundCountThread = multiThread(target=puppet.getSoundCount)
+                        soundCountThread.start()
+                        
                     eventBytes = json.loads(pytools.cipher.base64_decode(soundRegister.buffer[i][0]))
                     streamType = "Stream" + eventBytes["events"][0]["channel"][0].upper() + eventBytes["events"][0]["channel"][1:]
+                    soundName = eventBytes["events"][0]["path"]
                     
-                    if (soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and (soundRegister.lastAddCount < 3) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType]) and (soundRegister.cpuUsage < (sum(list(soundRegister.CPUUsageThreshold.values())) / len(soundRegister.CPUUsageThreshold))):
+                    if "high_pitch.mp3" in soundName:
+                        fapperWatchCountInBuffer = fapperWatchCountInBuffer + 1
+                    
+                    if (soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and (soundRegister.lastAddCount < math.ceil(soundRegister.maxSoundCount / 23)) and (((soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType])) or ((fapperWatchCountInBuffer > 7) and ("high_pitch.mp3" in soundName))) and (soundRegister.cpuUsage < (sum(list(soundRegister.CPUUsageThreshold.values())) / len(soundRegister.CPUUsageThreshold))) and (not os.path.exists("stopEventFiring.derp")) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)):
                         soundRegister.lastAddCount = soundRegister.lastAddCount + 1
-                        puppet.fireEvent(*soundRegister.buffer[i], fromBuffer=True)
-                        soundRegister.buffer.pop(i)
-                        i = i - 1
+                        if puppet.fireEvent(*soundRegister.buffer[i], fromBuffer=True, ignoreSpeakerCPU=((fapperWatchCountInBuffer > 7) and ("high_pitch.mp3" in soundName))):
+                            soundRegister.buffer.pop(i)
+                            i = i - 1
+                        else:
+                            print("INFO: Event firing blocked by external firing pin.")
                     else:
                         try:
-                            if (soundRegister.lastAddCount >= 3):
+                            if (soundRegister.lastAddCount >= math.ceil(soundRegister.maxSoundCount / 23)):
                                 print("WARNING: Large sound influx detected. Buffering...")
                             if (not vm.streams.isRunning):
                                 print("Streams detected as inactive. Blocking event firing...")
+                            if ((soundRegister.soundCount >= (soundRegister.maxSoundCount * 0.6))):
+                                print("Overload detected. Blocking event firing...")
+                            if (soundRegister.cpuUsage >= soundRegister.CPUUsageThreshold[streamType]):
+                                print("CPU Overload detected. Blocking event firing... (values @ " + str(soundRegister.cpuUsage) + ", " + str(soundRegister.CPUUsageThreshold[streamType]) + ", " + str(streamType) + ")")
+                            if (os.path.exists("stopEventFiring.derp")):
+                                print("Manual event firing override detected. Blocking event firing...")
                             print("Attempting to transfer audio event...")
-                            response = pytools.net.getJsonAPI("http://" + vm.server.hostname + ":" + str(random.randint(6000, 6029)) + "?json=" + urllib.parse.quote(json.dumps({
-                                "command": "transferEvent",
-                                "data": soundRegister.buffer[i][0],
-                                "fileData": soundRegister.buffer[i][1]
-                            })))
+                            try:
+                                response = pytools.net.getJsonAPI("http://" + vm.server.hostname + ":" + str(random.randint(6000, 6029)) + "?json=" + urllib.parse.quote(json.dumps({
+                                    "command": "transferEvent",
+                                    "data": soundRegister.buffer[i][0],
+                                    "fileData": soundRegister.buffer[i][1]
+                                })))
+                            except:
+                                response = {
+                                    "status": False
+                                }
                             if response["status"]:
                                 print("Audio event transfered.")
                                 soundRegister.buffer.pop(i)
@@ -376,6 +463,22 @@ class soundRegister:
                         except:
                             print(traceback.format_exc())
                     i = i + 1
+                    
+                    while (soundRegister.lastAddRemove + 1) < time.time():
+                        soundRegister.lastAddCount = soundRegister.lastAddCount - 1
+                        soundRegister.lastAddRemove = soundRegister.lastAddRemove + 1
+                        
+                    if soundRegister.lastAddCount < 0:
+                        soundRegister.lastAddCount = 0
+                    
+                    while (soundRegister.lastCPUThresholdAdd + 5) < time.time():
+                        for stream in soundRegister.CPUUsageThreshold:
+                            soundRegister.CPUUsageThreshold[stream] = soundRegister.CPUUsageThreshold[stream] + 1
+                            if soundRegister.CPUUsageThreshold[stream] > soundRegister.maxCPUUsage:
+                                soundRegister.CPUUsageThreshold[stream] = soundRegister.maxCPUUsage
+                        
+                        soundRegister.lastCPUThresholdAdd = soundRegister.lastCPUThresholdAdd + 5
+                            
             except:
                 print(traceback.format_exc())
             
@@ -393,10 +496,18 @@ class soundRegister:
                         soundRegister.CPUUsageThreshold[stream] = soundRegister.maxCPUUsage
             
                 soundRegister.lastCPUThresholdAdd = time.time()
+                
+            fapperWatchCountInBuffer = fapperWatchCountInBuffer - 8
+            
+            if fapperWatchCountInBuffer < 0:
+                fapperWatchCountInBuffer = 0 
             
             time.sleep(0.1)
 
 class puppet:
+    
+    gettingSoundCount = False
+    
     def getBenchmark():
         print("Getting benchmark...")
         return tools.benchmark.get()
@@ -436,12 +547,28 @@ class puppet:
             puppet.unsuspendEvents()
         return soundRegister.maxSoundCount
     
+    def setSoundCount(addBuffer):
+        
+        puppet.gettingSoundCount = True
+        
+        try:
+            if addBuffer:
+                system.soundCount = len(subprocess.getoutput("tasklist /fi \"IMAGENAME eq ambience.exe\" /fo:csv").split("\n")) + len(soundRegister.buffer)
+            else:
+                system.soundCount = len(subprocess.getoutput("tasklist /fi \"IMAGENAME eq ambience.exe\" /fo:csv").split("\n"))
+        except:
+            print(traceback.format_exc())
+            
+        puppet.gettingSoundCount = False
+    
+    
     def getSoundCount(addBuffer=False):
         print("Getting sound count...")
-        if addBuffer:
-            return len(subprocess.getoutput("tasklist /fi \"IMAGENAME eq ambience.exe\" /fo:csv").split("\n")) + len(soundRegister.buffer)
-        else:
-            return len(subprocess.getoutput("tasklist /fi \"IMAGENAME eq ambience.exe\" /fo:csv").split("\n"))
+        
+        if not puppet.gettingSoundCount:
+            threading.Thread(target=puppet.setSoundCount, args=(addBuffer,)).start()
+        
+        return system.soundCount
     
     def restart():
         print("Restarting client...")
@@ -467,7 +594,7 @@ class puppet:
             
         return True
     
-    def fireEvent(eventBytes, fileData, fromBuffer=False):
+    def fireEvent(eventBytes, fileData, fromBuffer=False, ignoreSpeakerCPU=False):
         duration = 0
         try:
             pathf = eventData["events"][i]["path"].replace("\\working\\", "\\")
@@ -482,7 +609,7 @@ class puppet:
         eventData = json.loads(pytools.cipher.base64_decode(eventBytes))
         streamType = "Stream" + eventData["events"][0]["channel"][0].upper() + eventData["events"][0]["channel"][1:]
         
-        if (duration > 240) or ((soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and (soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType]) and (soundRegister.cpuUsage < (sum(list(soundRegister.CPUUsageThreshold.values())) / len(soundRegister.CPUUsageThreshold)))):
+        if (duration > 240) or ((soundRegister.soundCount < (soundRegister.maxSoundCount * 0.6)) and vm.streams.isRunning and ((not system.sleepState) or (system.sleepState == -1)) and ((soundRegister.cpuUsage < soundRegister.CPUUsageThreshold[streamType]) or ignoreSpeakerCPU) and (soundRegister.cpuUsage < (sum(list(soundRegister.CPUUsageThreshold.values())) / len(soundRegister.CPUUsageThreshold)))):
             print("Audio events received.")
             if not flags.restart:
                 if fileData:
@@ -510,9 +637,14 @@ class puppet:
                     except:
                         if not os.path.exists("remember.derp"):
                             os.system("start /d \"" + os.getcwd().replace("\\working", "") + "\" /b "" .\\ambience.exe .\\modules\\audio.py --event=\"" + pytools.cipher.base64_encode(json.dumps(eventData)) + "\"")
-                        
+                
+                return True
+                       
         elif not fromBuffer:
             puppet.registerEvent(eventBytes, fileData)
+            return True
+        
+        return False
 
     def registerEvent(eventBytes, fileData):
         soundRegister.buffer.append([eventBytes, fileData])
@@ -601,122 +733,123 @@ class com:
     # }
     
     class httpCommands:
-        def _Get(request):
-            jsonRequest = urllib.parse.parse_qs(urllib.parse.unquote_plus(request))
+        def _Get(aRequest):
+            jsonRequest = aRequest
             print(jsonRequest)
-            return json.loads(jsonRequest["/?json"][0])
+            return json.loads(jsonRequest)
 
-    class MyServer(BaseHTTPRequestHandler):
-        def do_GET(self):
+    class MyServer():
+        
+        def __init__(self):
+            self.port = com.serverPort
+            self.server = ServerThread(self.app, com.hostName, self.port)
+            print("Main comm active on port " + str(self.port) + '.')
+            self.server.start()
+        
+        app = Flask(__name__)
+        cors = CORS(app)
+        app.config['CORS_HEADERS'] = 'Content-Type'
+        
+        @app.route("/")
+        def do_GET():
             if flags.restart == True:
                 exit()
             try:
-                self.send_response(200)
-                self.send_header("Content-type", "application/json")
-                self.end_headers()
-                request = com.httpCommands._Get(self.path)
-                if request["command"] == "getBenchmark":
-                    self.wfile.write(bytes(json.dumps({
+                
+                print(request.args.get('json'))
+                
+                aRequest = com.httpCommands._Get(request.args.get('json'))
+                if aRequest["command"] == "getBenchmark":
+                    return json.dumps({
                         "benchmark": puppet.getBenchmark()
-                    }), "utf-8"))
-                if request["command"] == "getMaxSoundCount":
-                    self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "getMaxSoundCount":
+                    return json.dumps({
                         "maxSoundCount": puppet.getMaxSoundCount()
-                    }), "utf-8"))
-                if request["command"] == "bufferUnderrun":
-                    if ("data" in request) and ("stream" in request["data"]):
-                        successEvent = puppet.bufferUnderrun(stream=request["data"]["stream"])
-                        self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "bufferUnderrun":
+                    if ("data" in aRequest) and ("stream" in aRequest["data"]):
+                        successEvent = puppet.bufferUnderrun(stream=aRequest["data"]["stream"])
+                        return json.dumps({
                             "status": ("success" * successEvent) + ("failed" * (not successEvent))
-                        }), "utf-8"))
+                        })
                     else:
                         successEvent = puppet.bufferUnderrun()
-                        self.wfile.write(bytes(json.dumps({
+                        return json.dumps({
                             "status": ("success" * successEvent) + ("failed" * (not successEvent))
-                        }), "utf-8"))
-                if request["command"] == "performFullRestart":
+                        })
+                if aRequest["command"] == "performFullRestart":
                     successEvent = puppet.performSystemRestart()
-                    self.wfile.write(bytes(json.dumps({
+                    return json.dumps({
                         "status": ("success" * successEvent) + ("failed" * (not successEvent))
-                    }), "utf-8"))
-                if request["command"] == "getSoundQueSize":
-                    self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "getSoundQueSize":
+                    return json.dumps({
                         "SoundQueSize": len(soundRegister.buffer)
-                    }), "utf-8"))
-                if request["command"] == "getVoicemeeterStatus":
-                    self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "getVoicemeeterStatus":
+                    return json.dumps({
                         "status": puppet.isVoicemeeterWorking()
-                    }), "utf-8"))
-                if request["command"] == "getCPUUsageThreshold":
-                    self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "getCPUUsageThreshold":
+                    return json.dumps({
                         "cpuUsageThreshold": puppet.getCPUUsageThreshold()
-                    }), "utf-8"))
-                if request["command"] == "getCPUUsage":
-                    self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "getCPUUsage":
+                    return json.dumps({
                         "cpuUsage": puppet.getCPUUsage()
-                    }), "utf-8"))
-                if request["command"] == "getSoundCount":
-                    if ("data" in request) and ("plusBuffer" in request["data"]) and request["data"]["plusBuffer"]:
-                        self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "getSoundCount":
+                    if ("data" in aRequest) and ("plusBuffer" in aRequest["data"]) and aRequest["data"]["plusBuffer"]:
+                        return json.dumps({
                             "soundCount": puppet.getSoundCount(addBuffer=True)
-                        }), "utf-8"))
+                        })
                     else:
-                        self.wfile.write(bytes(json.dumps({
+                        return json.dumps({
                             "soundCount": puppet.getSoundCount(addBuffer=False)
-                        }), "utf-8"))
-                if request["command"] == "sendAudioData":
-                    self.wfile.write(bytes(json.dumps({
-                        "success": puppet.receiveAudioData(request["data"]["fileName"], request["data"]["fileData"], request["data"]["isFirstSend"])
-                    }), "utf-8"))
-                if request["command"] == "fireEvent":
+                        })
+                if aRequest["command"] == "sendAudioData":
+                    return json.dumps({
+                        "success": puppet.receiveAudioData(aRequest["data"]["fileName"], aRequest["data"]["fileData"], aRequest["data"]["isFirstSend"])
+                    })
+                if aRequest["command"] == "fireEvent":
                     try:
-                        puppet.fireEvent(request["data"], request["fileData"])
+                        puppet.fireEvent(aRequest["data"], aRequest["fileData"])
                     except:
-                        puppet.fireEvent(request["data"], False)
-                    self.wfile.write(bytes(json.dumps({
+                        puppet.fireEvent(aRequest["data"], False)
+                    return json.dumps({
                         "status": "success"
-                    }), "utf-8"))
-                if request["command"] == "setFlag":
-                    puppet.generateFlag(request["data"]["flagName"], request["data"]["bool"])
-                    self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "setFlag":
+                    puppet.generateFlag(aRequest["data"]["flagName"], aRequest["data"]["bool"])
+                    return json.dumps({
                         "status": "success"
-                    }), "utf-8"))
-                if request["command"] == "killEvents":
+                    })
+                if aRequest["command"] == "killEvents":
                     puppet.killEvents()
-                    self.wfile.write(bytes(json.dumps({
+                    return json.dumps({
                         "status": "success"
-                    }), "utf-8"))
-                if request["command"] == "restart":
+                    })
+                if aRequest["command"] == "restart":
                     puppet.restart()
-                    self.wfile.write(bytes(json.dumps({
+                    return json.dumps({
                         "status": "success"
-                    }), "utf-8"))
-                    time.sleep(3)
-                    com.webServer.server_close()
-                    exit()
-                if request["command"] == "ping":
-                    self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "ping":
+                    return json.dumps({
                         "status": "success"
-                    }), "utf-8"))
-                if request["command"] == "getSleepStateCount":
-                    self.wfile.write(bytes(json.dumps({
+                    })
+                if aRequest["command"] == "getSleepStateCount":
+                    return json.dumps({
                         "sleepStateCount": puppet.getSleepStateCount()
-                    }), "utf-8"))
+                    })
             except:
                 print(traceback.format_exc())
-                self.send_error(400, traceback.format_exc())
+                return traceback.format_exc()
 
     def start():
-        com.webServer = HTTPServer((com.hostName, com.serverPort), com.MyServer)
+        com.webServer = com.MyServer()
         print("Server started http://%s:%s" % (com.hostName, com.serverPort))
-
-        try:
-            com.webServer.serve_forever()
-        except KeyboardInterrupt:
-            pass
-
-        com.webServer.server_close()
-        print("Server stopped.")
 
     def run():
         if not flags.skipCompile:
@@ -734,8 +867,14 @@ class com:
 
         adapterResetCounter = 0
         
+        streamsLastStillRunning = time.time()
+        
         pytools.IO.saveJson(".\\benchmark.json", {"soundMax": tools.benchmark.getNumberOfPlugins(tools.benchmark.get())})
         while not flags.restart:
+            
+            if vm.streams.isRunning:
+                streamsLastStillRunning = time.time()
+            
             time.sleep(1)
             try:
                 if os.system("ping google.com -n 4 -w 1 -l 1 > null") != 0:
@@ -747,16 +886,51 @@ class com:
                 if adapterResetCounter > 3:
                     system.restartNetworkAdapters()
                     adapterResetCounter = 0
+                    
+            try:
+                while (soundRegister.lastCPUThresholdAdd + 5) < time.time():
+                    for stream in soundRegister.CPUUsageThreshold:
+                        soundRegister.CPUUsageThreshold[stream] = soundRegister.CPUUsageThreshold[stream] + 1
+                        if soundRegister.CPUUsageThreshold[stream] > soundRegister.maxCPUUsage:
+                            soundRegister.CPUUsageThreshold[stream] = soundRegister.maxCPUUsage
+                    
+                    soundRegister.lastCPUThresholdAdd = soundRegister.lastCPUThresholdAdd + 5
+            except:
+                pass
+                    
             try:
                 while pytools.net.getJsonAPI("http://localhost:4507?json=" + urllib.parse.quote(json.dumps({
                     "command": "ping"
-                })))["status"] == "success":
+                })), timeout=15)["status"] == "success":
+                    
+                    try:
+                        while (soundRegister.lastCPUThresholdAdd + 5) < time.time():
+                            for stream in soundRegister.CPUUsageThreshold:
+                                soundRegister.CPUUsageThreshold[stream] = soundRegister.CPUUsageThreshold[stream] + 1
+                                if soundRegister.CPUUsageThreshold[stream] > soundRegister.maxCPUUsage:
+                                    soundRegister.CPUUsageThreshold[stream] = soundRegister.maxCPUUsage
+                            
+                            soundRegister.lastCPUThresholdAdd = soundRegister.lastCPUThresholdAdd + 5
+                    except:
+                        pass
+                    
                     try:
                         xw = 0
                         while xw < 15:
                             soundRegister.cpuUsage = pytools.system.getCPU(1)
                             time.sleep(1)
                             xw = xw + 1
+                            
+                            try:
+                                if (vm.streams.lastUpdated + 150) < time.time():
+                                    print("Streams Handler Crash Detected. Relaunching...")
+                                    threads.vbanHandler = threading.Thread(target=vm.streams.handler)
+                                    threads.vbanHandler.start()
+                                    vm.streams.lastUpdated = time.time()
+                                    vm.streams.isRunning = False
+                            except:
+                                print(traceback.format_exc())
+                            
                     except:
                         time.sleep(15)
                 threadHttp = threading.Thread(target=com.start)
@@ -769,6 +943,7 @@ class com:
 
             try:
                 if (vm.streams.lastUpdated + 300) < time.time():
+                    print("Streams Handler Crash Detected. Relaunching...")
                     threads.vbanHandler = threading.Thread(target=vm.streams.handler)
                     threads.vbanHandler.start()
             except:
@@ -786,6 +961,9 @@ try:
         if flag.split("=")[0] == "--manualReturn":
             flags.manualReturn = flag.split("=")[1]
             vm.flags.manualReturn = flags.manualReturn
+        if flag.split("=")[0] == "--noStreamKill":
+            flags.dontResetVban = True
+            vm.flags.dontResetVban = True
         if flag == "--run":
             runf = True
     if runf:

@@ -34,6 +34,7 @@ class globals:
 class flags:
     restart = False
     manualReturn = False
+    dontResetVban = False
 
 class server:
     
@@ -292,10 +293,23 @@ class configure:
         def getDaisyChain():
             print("Grabbing clients...")
             clients = server.grabOtherComputers()["hosts"]
+            
             if "0.0.0.0" in clients:
                 clients.remove("0.0.0.0")
             if "192.168.2.40" in clients:
                 clients.remove("192.168.2.40")
+                
+            originalClients = copy.deepcopy(clients)
+            newClients = []
+            
+            for aClient in clients:
+                if os.path.exists(".\\puntHost-" + aClient + ".derp"):
+                    newClients.append(aClient)
+                    originalClients.remove(aClient)
+            
+            newClients.extend(originalClients)
+            clients = newClients
+                
             permaClients = pytools.IO.getJson(".\\permaclients.json")
             if permaClients["primary"] in clients:
                 try:
@@ -354,7 +368,8 @@ class vbanStream:
         self.previousReceive = False
         self.previousSend = False
         self.lastUpdate = time.time()
-        self.killProcess()
+        if not flags.dontResetVban:
+            self.killProcess()
         
     def killProcess(self):
         os.system("taskkill /f /im vbanStream_" + self.speakerType + ".exe")
@@ -370,6 +385,7 @@ class vbanStream:
     def updateClients(self, clients):
         
         if clients[1] != self.previousSend:
+            print("Stream " + self.speakerType + " send update detected. [" + str(clients[1]) + ", " + str(self.previousSend) + "] Restarting...")
             self.killProcess()
             self.killProcess()
             self.killProcess()
@@ -383,6 +399,8 @@ class vbanStream:
             self.lastUpdate = time.time()
             
         if (clients[0] != self.previousReceive): #  and ((self.previousReceive == False) or ((time.time() - self.lastUpdate) > 3600)):
+            
+            print("Stream " + self.speakerType + " receive update detected. [" + str(clients[1]) + ", " + str(self.previousSend) + "] Restarting...")
             self.killProcess()
             self.killProcess()
             self.killProcess()
@@ -434,13 +452,25 @@ class streams:
     hasExited = False
     isRunning = False
     
+    handlerCount = 0
+    
+    streamClock = False
+    streamFireplace = False
+    streamWindow = False
+    streamOutside = False
+    streamPorch = False
+    streamGeneric = False
+    streamLight = False
+    
     def shutdown():
+        print("Shutting down streams...")
         streams.exitf = True
-        while (not streams.hasExited) and streams.isRunning:
+        while (not streams.hasExited) and streams.isRunning and (streams.handlerCount <= 0):
             streams.exitf = True
             time.sleep(1)
             
         streams.hasExited = False
+        streams.exitf = False
 
     def _parityWatchdog(streamObj: vbanStream):
         
@@ -457,65 +487,114 @@ class streams:
             streamObj.startProcess()
 
     def handler():
-        clients = configure.vban.getDaisyChain()
-        clientsOld = clients
+        
+        try:
+            streams.hasExited = False
+            
+            clients = configure.vban.getDaisyChain()
+            clientsOld = clients
 
-        if flags.manualReturn:
-            clients[1] = flags.manualReturn
+            if flags.manualReturn:
+                clients[1] = flags.manualReturn
+            
+            time.sleep(random.random())
+            
+            if streams.isRunning:
+                print("Streams already running.")
+                return
+            else:
+                streams.handlerCount = 0
+            
+            if not streams.streamClock:
+                streams.streamClock = vbanStream("clock")
+            if not streams.streamFireplace:
+                streams.streamFireplace = vbanStream("fireplace")
+            if not streams.streamWindow:
+                streams.streamWindow = vbanStream("window")
+            if not streams.streamOutside:
+                streams.streamOutside = vbanStream("outside")
+            if not streams.streamPorch:
+                streams.streamPorch = vbanStream("porch")
+            if not streams.streamGeneric:
+                streams.streamGeneric = vbanStream("generic")
+            if not streams.streamLight:
+                streams.streamLight = vbanStream("light")
+            
+            if not flags.dontResetVban:
+                streams.streamClock.updateClients(clients)
+                streams.streamFireplace.updateClients(clients)
+                streams.streamWindow.updateClients(clients)
+                streams.streamOutside.updateClients(clients)
+                streams.streamPorch.updateClients(clients)
+                streams.streamGeneric.updateClients(clients)
+                streams.streamLight.updateClients(clients)
+            
+            exitf = False
+            
+            oldClockParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamClock,))
+            oldFireplaceParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamFireplace,))
+            oldWindowParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamWindow,))
+            oldOutsideParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamOutside,))
+            oldPorchParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamPorch,))
+            oldGenericParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamGeneric,))
+            oldLightParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamLight,))
+            
+            oldClockParityThread.start()
+            oldFireplaceParityThread.start()
+            oldWindowParityThread.start()
+            oldOutsideParityThread.start()
+            oldPorchParityThread.start()
+            oldGenericParityThread.start()
+            oldLightParityThread.start()
+            
+            if flags.dontResetVban:
+                time.sleep(15)
+                
+            previousLastUpdated = streams.lastUpdated
+            
+        except:
+            print(traceback.format_exc())
+            
+            streams.isRunning = False
+            streams.hasExited = False
+            
+            print("__STREAM__ERROR__")
+            
+            streams.streamClock.killProcess()
+            streams.streamFireplace.killProcess()
+            streams.streamWindow.killProcess()
+            streams.streamOutside.killProcess()
+            streams.streamPorch.killProcess()
+            streams.streamGeneric.killProcess()
+            streams.streamLight.killProcess()
+            
+            return
         
-        streamClock = vbanStream("clock")
-        streamFireplace = vbanStream("fireplace")
-        streamWindow = vbanStream("window")
-        streamOutside = vbanStream("outside")
-        streamPorch = vbanStream("porch")
-        streamGeneric = vbanStream("generic")
-        streamLight = vbanStream("light")
-        
-        streamClock.updateClients(clients)
-        streamFireplace.updateClients(clients)
-        streamWindow.updateClients(clients)
-        streamOutside.updateClients(clients)
-        streamPorch.updateClients(clients)
-        streamGeneric.updateClients(clients)
-        streamLight.updateClients(clients)
-        
-        exitf = False
-        
-        oldClockParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamClock,))
-        oldFireplaceParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamFireplace,))
-        oldWindowParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamWindow,))
-        oldOutsideParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamOutside,))
-        oldPorchParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamPorch,))
-        oldGenericParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamGeneric,))
-        oldLightParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamLight,))
-        
-        oldClockParityThread.start()
-        oldFireplaceParityThread.start()
-        oldWindowParityThread.start()
-        oldOutsideParityThread.start()
-        oldPorchParityThread.start()
-        oldGenericParityThread.start()
-        oldLightParityThread.start()
+        print("Starting streams...")
         
         loopCounter = 0
-        while (not flags.restart) and (not exitf) and not (streams.exitf):
+        while (not flags.restart) and (not exitf) and (not (streams.exitf)) and (streams.handlerCount == 0):
+            
+            streams.isRunning = True
+                
+            streams.handlerCount = streams.handlerCount + 1
+            
             try:
-                streams.isRunning = True
                 
                 clients = configure.vban.getDaisyChain()
                 
                 if flags.manualReturn:
                     clients[1] = flags.manualReturn
                 
-                streamClock.updateClients(clients)
-                streamFireplace.updateClients(clients)
-                streamWindow.updateClients(clients)
-                streamOutside.updateClients(clients)
-                streamPorch.updateClients(clients)
-                streamGeneric.updateClients(clients)
-                streamLight.updateClients(clients)
+                streams.streamClock.updateClients(clients)
+                streams.streamFireplace.updateClients(clients)
+                streams.streamWindow.updateClients(clients)
+                streams.streamOutside.updateClients(clients)
+                streams.streamPorch.updateClients(clients)
+                streams.streamGeneric.updateClients(clients)
+                streams.streamLight.updateClients(clients)
                 
-                if loopCounter > 35:
+                if loopCounter > 60:
                     
                     def _attachToThread(thread: threading.Thread):
                         try:
@@ -531,13 +610,13 @@ class streams:
                     _attachToThread(oldGenericParityThread)
                     _attachToThread(oldLightParityThread)
                     
-                    oldClockParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamClock,))
-                    oldFireplaceParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamFireplace,))
-                    oldWindowParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamWindow,))
-                    oldOutsideParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamOutside,))
-                    oldPorchParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamPorch,))
-                    oldGenericParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamGeneric,))
-                    oldLightParityThread = threading.Thread(target=streams._parityWatchdog, args=(streamLight,))
+                    oldClockParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamClock,))
+                    oldFireplaceParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamFireplace,))
+                    oldWindowParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamWindow,))
+                    oldOutsideParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamOutside,))
+                    oldPorchParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamPorch,))
+                    oldGenericParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamGeneric,))
+                    oldLightParityThread = threading.Thread(target=streams._parityWatchdog, args=(streams.streamLight,))
                     
                     oldClockParityThread.start()
                     oldFireplaceParityThread.start()
@@ -548,22 +627,38 @@ class streams:
                     oldLightParityThread.start()
                     
                     loopCounter = 0
-                
-                streams.lastUpdated = time.time()
+                    
+                if streams.lastUpdated != previousLastUpdated:
+                    exitf = True
+                    break
+                else:
+                    streams.lastUpdated = time.time()
+                    previousLastUpdated = streams.lastUpdated
                 
                 print("Streams handler is alive.")
                 loopCounter = loopCounter + 1
                 time.sleep(1)
             except:
                 print(traceback.format_exc())
+                streams.lastUpdated = time.time()
+                
+            streams.handlerCount = streams.handlerCount - 1
         
-        streamClock.killProcess()
-        streamFireplace.killProcess()
-        streamWindow.killProcess()
-        streamOutside.killProcess()
-        streamPorch.killProcess()
-        streamGeneric.killProcess()
-        streamLight.killProcess()
+        print("Streams have exited. [" + str(not flags.restart) + ", " + str(not exitf) + ", " + str(not (streams.exitf)) + ", " + str(oldHandlerCount == 0) + "]")
+        
+        oldHandlerCount = streams.handlerCount
+        streams.handlerCount = 0
+        
+        if not oldHandlerCount:
+            streams.streamClock.killProcess()
+            streams.streamFireplace.killProcess()
+            streams.streamWindow.killProcess()
+            streams.streamOutside.killProcess()
+            streams.streamPorch.killProcess()
+            streams.streamGeneric.killProcess()
+            streams.streamLight.killProcess()
+        else:
+            flags.dontResetVban = True
         
         streams.isRunning = False
         streams.hasExited = True

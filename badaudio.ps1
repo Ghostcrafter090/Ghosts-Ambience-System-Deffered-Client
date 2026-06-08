@@ -26,7 +26,7 @@ function Get-BadAudio {
             $dateStr = getDate;
             $timeStr = getTime;
             $path = ".\logs\errors\" + $dateStr + "\\austin_trace_" + $timeStr + ".log";
-            austin -p $_.Id --exposure=5 -o $path;
+            // austin -p $_.Id --exposure=5 -o $path;
             taskkill /f /im $_.Id;
         }
     }

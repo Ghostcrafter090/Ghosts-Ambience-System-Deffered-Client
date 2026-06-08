@@ -403,7 +403,7 @@ if os.path.exists("..\\soundOutputs.json"):
     globals.speakers = pytools.IO.getJson("..\\soundOutputs.json")
     
 class tools:
-    def setOutputs():
+    def setOutputs(noSleep=False):
         if os.path.exists(".\\soundOutputs.json"):
             globals.speakers = pytools.IO.getJson(".\\soundOutputs.json")
         if os.path.exists("..\\soundOutputs.json"):
@@ -414,7 +414,8 @@ class tools:
             for channel in globals.speakers:
                 for n in devices:
                     import time
-                    time.sleep(0.1)
+                    if not noSleep:
+                        time.sleep(0.1)
                     if globals.speakers[channel][0] == n["name"]:
                         if globals.speakers[channel][1] == "MME":
                             if n["hostapi"] == 0:
