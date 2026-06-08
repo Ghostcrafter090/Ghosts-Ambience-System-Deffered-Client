@@ -1,6 +1,6 @@
+import modules.audio as audio
 import vm
 import modules.pytools as pytools
-import modules.audio as audio
 import modules.vban as vban
 import modules.logManager as log
 
@@ -99,6 +99,8 @@ def run():
                 check = checkRunning()
             except:
                 pass
+            
+            time.sleep(random.random())
         i = i + 1
         time.sleep(random.random())
         
@@ -137,4 +139,4 @@ if __name__ == "__main__":
     except:
         print(traceback.format_exc())
 
-# py vban_stream.py --run --clients=False,192.168.2.40 --speakerType=fireplace --hostname=192.168.2.40 
+# py vban_stream.py --run --clients=False,192.168.2.30 --speakerType=fireplace --hostname=192.168.2.30 

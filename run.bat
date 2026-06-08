@@ -9,6 +9,10 @@ if not exist "%exec:~,-11%\ambience_client.exe" (
     copy /y "%exec%" "%exec:~,-11%\ambience_client.exe"
 )
 
+if not exist "%exec:~,-11%\ambience.exe" (
+    copy /y "%exec%" "%exec:~,-11%\ambience.exe"
+)
+
 if not exist "%temp%\%date%_compile.derp" (
     start /high "" "%exec:~,-11%\ambience_client.exe" client.py --run
     echo null > "%temp%\%date%_compile.derp"

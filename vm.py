@@ -200,6 +200,9 @@ class vm:
             return False
 
 class configure:
+    
+    oneWindow = False
+    
     def fixAudioDg():
         audioDgSize = float(subprocess.getoutput('tasklist /fi "IMAGENAME eq audiodg.exe" /fo csv').split("\n")[1].split("\",\"")[-1].replace(",", "").replace(" K\"", ""))
         if audioDgSize > 500000.0:
@@ -291,8 +294,13 @@ class configure:
         isAloneCheck = 0
         
         def getDaisyChain():
+            server.grabOtherComputers()
             print("Grabbing clients...")
-            clients = server.grabOtherComputers()["hosts"]
+            clients = pytools.IO.getJson("hostRouting.json")["hosts"]
+            if server.interface not in clients:
+                workClients = [server.interface]
+                workClients.extend(clients)
+                clients = workClients
             
             if "0.0.0.0" in clients:
                 clients.remove("0.0.0.0")
@@ -300,8 +308,8 @@ class configure:
                 clients.remove("192.168.2.40")
                 
             originalClients = copy.deepcopy(clients)
-            newClients = []
             
+            newClients = []
             for aClient in clients:
                 if os.path.exists(".\\puntHost-" + aClient + ".derp"):
                     newClients.append(aClient)
@@ -337,7 +345,7 @@ class configure:
                 if selfIndex == (len(sortedClients) - 1):
                     configure.vban.isAloneCheck = configure.vban.isAloneCheck + 1
                     print("Is End Of Chain Check: " + str(configure.vban.isAloneCheck))
-                    if configure.vban.isAloneCheck > 20:
+                    if configure.vban.isAloneCheck > 5:
                         nextClient = server.hostname
                     else:
                         return configure.vban.previousDaisyChain
@@ -348,7 +356,7 @@ class configure:
                 print(traceback.format_exc())
                 print("Is End Of Chain Check: " + str(configure.vban.isAloneCheck))
                 configure.vban.isAloneCheck = configure.vban.isAloneCheck + 1
-                if configure.vban.isAloneCheck > 20:
+                if configure.vban.isAloneCheck > 5:
                     nextClient = server.hostname
                 else:
                     return configure.vban.previousDaisyChain
@@ -380,7 +388,21 @@ class vbanStream:
             
         os.system("copy \"" + sys.executable + "\" \""  + "\\".join(sys.executable.split("\\")[:-1]) + "\\vbanStream_" + self.speakerType + ".exe\" /y")
         os.system("copy \"C:\\Windows\\py.exe\" \".\\vbanStream_" + self.speakerType + ".exe\" /y")
-        os.system("start /min \"\" \".\\vbanStream_" + self.speakerType + ".exe\" vban_stream.py --run --clients=" + str(clients[0]) + "," + str(clients[1]) + " --speakerType=" + self.speakerType + " --hostname=" + server.hostname) 
+        
+        configStr = ""
+        if os.path.exists("stream_config.json"):
+            config = pytools.IO.getJson("stream_config.json")
+            if config["affinity"] == "all":
+                config["affinity"] = "FFFFFFFFFFFFFFFF"
+            
+            configStr = " /affinity " + config["affinity"] + " /" + config["priority"]
+        
+        # start /min "" "vbanStream_fireplace.exe" vban_stream.py --run --clients=False,192.168.2.40 --speakerType=StreamFireplace --hostname=192.168.2.40
+        
+        if configure.oneWindow:
+            os.system("start /b " + configStr + " \"\" \"" + "\\".join(sys.executable.split("\\")[:-1]) + "\\vbanStream_" + self.speakerType + ".exe\" vban_stream.py --run --clients=" + str(clients[0]) + "," + str(clients[1]) + " --speakerType=" + self.speakerType + " --hostname=" + server.hostname) 
+        else:
+            os.system("start /min " + configStr + " \"\" \"" + "\\".join(sys.executable.split("\\")[:-1]) + "\\vbanStream_" + self.speakerType + ".exe\" vban_stream.py --run --clients=" + str(clients[0]) + "," + str(clients[1]) + " --speakerType=" + self.speakerType + " --hostname=" + server.hostname) 
         
     def updateClients(self, clients):
         

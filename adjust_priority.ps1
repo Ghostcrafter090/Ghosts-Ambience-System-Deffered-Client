@@ -34,5 +34,19 @@ while ($true) {
             $_.SetPriority(256)
         }
     }
-    Start-Sleep -Seconds 10
+
+    $numberOfCores = (Get-CimInstance Win32_Processor).NumberOfCores
+    $affinity = [Math]::Pow(2, $numberOfCores) - 1
+
+    # manual $affinity = 63
+    Get-Process "vbanStream_clock" | ForEach-Object { $_.ProcessorAffinity = $affinity; };
+    Get-Process "vbanStream_fireplace" | ForEach-Object { $_.ProcessorAffinity = $affinity; };
+    Get-Process "vbanStream_window" | ForEach-Object { $_.ProcessorAffinity = $affinity; };
+    Get-Process "vbanStream_outside" | ForEach-Object { $_.ProcessorAffinity = $affinity; };
+    Get-Process "vbanStream_generic" | ForEach-Object { $_.ProcessorAffinity = $affinity; };
+    Get-Process "vbanStream_porch" | ForEach-Object { $_.ProcessorAffinity = $affinity; };
+    Get-Process "vbanStream_light" | ForEach-Object { $_.ProcessorAffinity = $affinity; };
+    Get-Process "ambience" | ForEach-Object { $_.ProcessorAffinity = $affinity; };
+
+    Start-Sleep -Seconds 3
 }

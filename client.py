@@ -122,6 +122,9 @@ class flags:
     restart = False
     manualReturn = False
     dontResetVban = False
+    isHelper = False
+    soundAffinity = False
+    soundPriority = False
     
 class threads:
     threadHttp = False
@@ -131,8 +134,7 @@ class threads:
     threadSleepHandler = False
     soundHandler = False
     vbanHandler = False
-
-
+    cpuMonitor = False
 
 class powershell:
     def __init__(self, strf):
@@ -332,7 +334,7 @@ class soundRegister:
     maxSoundCount = -1
     soundCount = 0
     
-    cpuUsage = 70
+    cpuUsage = 100
     
     maxCPUUsage = 95
     CPUUsageThreshold = {
@@ -355,6 +357,7 @@ class soundRegister:
         soundCountThread = multiThread(target=puppet.getSoundCount)
         soundCountThread.start()
         fapperWatchCountInBuffer = 0
+        soundRegister.lastAddRemove = time.time()
         
         while not flags.restart:
             # print("Sound handler looping...")
@@ -451,8 +454,9 @@ class soundRegister:
                                     "command": "transferEvent",
                                     "data": soundRegister.buffer[i][0],
                                     "fileData": soundRegister.buffer[i][1]
-                                })))
+                                })), timeout=1)
                             except:
+                                print(traceback.format_exc())
                                 response = {
                                     "status": False
                                 }
@@ -474,8 +478,8 @@ class soundRegister:
                     while (soundRegister.lastCPUThresholdAdd + 5) < time.time():
                         for stream in soundRegister.CPUUsageThreshold:
                             soundRegister.CPUUsageThreshold[stream] = soundRegister.CPUUsageThreshold[stream] + 1
-                            if soundRegister.CPUUsageThreshold[stream] > soundRegister.maxCPUUsage:
-                                soundRegister.CPUUsageThreshold[stream] = soundRegister.maxCPUUsage
+                            if soundRegister.CPUUsageThreshold[stream] > (soundRegister.maxCPUUsage - (flags.isHelper * 10)):
+                                soundRegister.CPUUsageThreshold[stream] = (soundRegister.maxCPUUsage - (flags.isHelper * 10))
                         
                         soundRegister.lastCPUThresholdAdd = soundRegister.lastCPUThresholdAdd + 5
                             
@@ -492,8 +496,8 @@ class soundRegister:
             if (soundRegister.lastCPUThresholdAdd + 5) < time.time():
                 for stream in soundRegister.CPUUsageThreshold:
                     soundRegister.CPUUsageThreshold[stream] = soundRegister.CPUUsageThreshold[stream] + 1
-                    if soundRegister.CPUUsageThreshold[stream] > soundRegister.maxCPUUsage:
-                        soundRegister.CPUUsageThreshold[stream] = soundRegister.maxCPUUsage
+                    if soundRegister.CPUUsageThreshold[stream] > (soundRegister.maxCPUUsage - (flags.isHelper * 10)):
+                        soundRegister.CPUUsageThreshold[stream] = (soundRegister.maxCPUUsage - (flags.isHelper * 10))
             
                 soundRegister.lastCPUThresholdAdd = time.time()
                 
@@ -507,6 +511,9 @@ class soundRegister:
 class puppet:
     
     gettingSoundCount = False
+    
+    def resetSoftware():
+        os.system("start /min \"\" cmd.exe /c taskkill /f /im ambience_client.exe")
     
     def getBenchmark():
         print("Getting benchmark...")
@@ -527,7 +534,10 @@ class puppet:
                     return False
     
     def getCPUUsageThreshold():
-        return sum(list(soundRegister.CPUUsageThreshold.values())) / len(list(soundRegister.CPUUsageThreshold.values()))
+        return (sum(list(soundRegister.CPUUsageThreshold.values())) / len(list(soundRegister.CPUUsageThreshold.values())))
+    
+    def getCPUUsageThresholdComplex():
+        return soundRegister.CPUUsageThreshold
     
     def getCPUUsage():
         return soundRegister.cpuUsage
@@ -623,20 +633,24 @@ class puppet:
                     print("Firing Audio Event " + str(eventData["events"][i]["path"]) + "...")
                     i = i + 1
                 eventData["wait"] = False
+                
+                if not os.path.exists("\\".join(sys.executable.split("\\")[:-1]) + "\\ambience.exe"):
+                    os.system("copy \"" + sys.executable + "\" \"" + "\\".join(sys.executable.split("\\")[:-1]) + "\\ambience.exe" + "\" /y")
+                
                 if eventData["wait"]:
                     try:
                         if eventData["rememberanceBypass"] or (not os.path.exists("remember.derp")):
-                            os.system("start /d \"" + os.getcwd().replace("\\working", "") + "\" /b /wait "" .\\ambience.exe .\\modules\\audio.py --event=\"" + pytools.cipher.base64_encode(json.dumps(eventData)) + "\"")
+                            os.system("start /d \"" + os.getcwd().replace("\\working", "") + "\" /b " + (("/affinity " + str(flags.soundAffinity)) * (flags.soundAffinity != False)) + " " + (("/ " + str(flags.soundPriority)) * (flags.soundPriority != False)) + " /wait \"\" \"" + "\\".join(sys.executable.split("\\")[:-1]) + "\\ambience.exe" + "\" .\\modules\\audio.py --event=\"" + pytools.cipher.base64_encode(json.dumps(eventData)) + "\"")
                     except:
                         if not os.path.exists("remember.derp"):
-                            os.system("start /d \"" + os.getcwd().replace("\\working", "") + "\" /b /wait "" .\\ambience.exe .\\modules\\audio.py --event=\"" + pytools.cipher.base64_encode(json.dumps(eventData)) + "\"")
+                            os.system("start /d \"" + os.getcwd().replace("\\working", "") + "\" /b " + (("/affinity " + str(flags.soundAffinity)) * (flags.soundAffinity != False)) + " " + (("/ " + str(flags.soundPriority)) * (flags.soundPriority != False)) + " /wait \"\" \"" + "\\".join(sys.executable.split("\\")[:-1]) + "\\ambience.exe" + "\" .\\modules\\audio.py --event=\"" + pytools.cipher.base64_encode(json.dumps(eventData)) + "\"")
                 else:
                     try:
                         if eventData["rememberanceBypass"] or (not os.path.exists("remember.derp")):
-                            os.system("start /d \"" + os.getcwd().replace("\\working", "") + "\" /b "" .\\ambience.exe .\\modules\\audio.py --event=\"" + pytools.cipher.base64_encode(json.dumps(eventData)) + "\"")
+                            os.system("start /d \"" + os.getcwd().replace("\\working", "") + "\" /b " + (("/affinity " + str(flags.soundAffinity)) * (flags.soundAffinity != False)) + " " + (("/ " + str(flags.soundPriority)) * (flags.soundPriority != False)) + " \"\" \"" + "\\".join(sys.executable.split("\\")[:-1]) + "\\ambience.exe" + "\" .\\modules\\audio.py --event=\"" + pytools.cipher.base64_encode(json.dumps(eventData)) + "\"")
                     except:
                         if not os.path.exists("remember.derp"):
-                            os.system("start /d \"" + os.getcwd().replace("\\working", "") + "\" /b "" .\\ambience.exe .\\modules\\audio.py --event=\"" + pytools.cipher.base64_encode(json.dumps(eventData)) + "\"")
+                            os.system("start /d \"" + os.getcwd().replace("\\working", "") + "\" " + (("/affinity " + str(flags.soundAffinity)) * (flags.soundAffinity != False)) + " " + (("/ " + str(flags.soundPriority)) * (flags.soundPriority != False)) + " /b \"\" \"" + "\\".join(sys.executable.split("\\")[:-1]) + "\\ambience.exe" + "\" .\\modules\\audio.py --event=\"" + pytools.cipher.base64_encode(json.dumps(eventData)) + "\"")
                 
                 return True
                        
@@ -795,6 +809,10 @@ class com:
                     return json.dumps({
                         "cpuUsageThreshold": puppet.getCPUUsageThreshold()
                     })
+                if aRequest["command"] == "getCPUUsageThresholdComplex":
+                    return json.dumps({
+                        "data": puppet.getCPUUsageThresholdComplex()
+                    })
                 if aRequest["command"] == "getCPUUsage":
                     return json.dumps({
                         "cpuUsage": puppet.getCPUUsage()
@@ -835,6 +853,11 @@ class com:
                     return json.dumps({
                         "status": "success"
                     })
+                if aRequest["command"] == "forceResetSoftware":
+                    puppet.resetSoftware()
+                    return json.dumps({
+                        "status": "success"
+                    })
                 if aRequest["command"] == "ping":
                     return json.dumps({
                         "status": "success"
@@ -851,16 +874,33 @@ class com:
         com.webServer = com.MyServer()
         print("Server started http://%s:%s" % (com.hostName, com.serverPort))
 
+    def monitorCPU():
+        while not flags.restart:
+            soundRegister.cpuUsage = pytools.system.getCPU(1)
+            
+            try:
+                while (soundRegister.lastCPUThresholdAdd + 5) < time.time():
+                    for stream in soundRegister.CPUUsageThreshold:
+                        soundRegister.CPUUsageThreshold[stream] = soundRegister.CPUUsageThreshold[stream] + 1
+                        if soundRegister.CPUUsageThreshold[stream] > (soundRegister.maxCPUUsage - (flags.isHelper * 10)):
+                            soundRegister.CPUUsageThreshold[stream] = (soundRegister.maxCPUUsage - (flags.isHelper * 10))
+                    
+                    soundRegister.lastCPUThresholdAdd = soundRegister.lastCPUThresholdAdd + 5
+            except:
+                print(traceback.format_exc())
+
     def run():
         if not flags.skipCompile:
             compiler.runGlobal()
         threads.threadHttp = threading.Thread(target=com.start)
         threads.soundHandler = threading.Thread(target=soundRegister.run)
         threads.vbanHandler = threading.Thread(target=vm.streams.handler)
-
+        threads.cpuMonitor = threading.Thread(target=com.monitorCPU)
+        
         threads.vbanHandler.start()
         threads.threadHttp.start()
         threads.soundHandler.start()
+        threads.cpuMonitor.start()
         
         threads.threadSleepHandler = threading.Thread(target=system.sleepHandler)
         threads.threadSleepHandler.start()
@@ -869,7 +909,10 @@ class com:
         
         streamsLastStillRunning = time.time()
         
-        pytools.IO.saveJson(".\\benchmark.json", {"soundMax": tools.benchmark.getNumberOfPlugins(tools.benchmark.get())})
+        try:
+            pytools.IO.saveJson(".\\benchmark.json", {"soundMax": tools.benchmark.getNumberOfPlugins(tools.benchmark.get())})
+        except:
+            print(traceback.format_exc())
         while not flags.restart:
             
             if vm.streams.isRunning:
@@ -891,8 +934,8 @@ class com:
                 while (soundRegister.lastCPUThresholdAdd + 5) < time.time():
                     for stream in soundRegister.CPUUsageThreshold:
                         soundRegister.CPUUsageThreshold[stream] = soundRegister.CPUUsageThreshold[stream] + 1
-                        if soundRegister.CPUUsageThreshold[stream] > soundRegister.maxCPUUsage:
-                            soundRegister.CPUUsageThreshold[stream] = soundRegister.maxCPUUsage
+                        if soundRegister.CPUUsageThreshold[stream] > (soundRegister.maxCPUUsage - (flags.isHelper * 10)):
+                            soundRegister.CPUUsageThreshold[stream] = (soundRegister.maxCPUUsage - (flags.isHelper * 10))
                     
                     soundRegister.lastCPUThresholdAdd = soundRegister.lastCPUThresholdAdd + 5
             except:
@@ -907,8 +950,8 @@ class com:
                         while (soundRegister.lastCPUThresholdAdd + 5) < time.time():
                             for stream in soundRegister.CPUUsageThreshold:
                                 soundRegister.CPUUsageThreshold[stream] = soundRegister.CPUUsageThreshold[stream] + 1
-                                if soundRegister.CPUUsageThreshold[stream] > soundRegister.maxCPUUsage:
-                                    soundRegister.CPUUsageThreshold[stream] = soundRegister.maxCPUUsage
+                                if soundRegister.CPUUsageThreshold[stream] > (soundRegister.maxCPUUsage - (flags.isHelper * 10)):
+                                    soundRegister.CPUUsageThreshold[stream] = (soundRegister.maxCPUUsage - (flags.isHelper * 10))
                             
                             soundRegister.lastCPUThresholdAdd = soundRegister.lastCPUThresholdAdd + 5
                     except:
@@ -918,7 +961,6 @@ class com:
                         xw = 0
                         while xw < 15:
                             soundRegister.cpuUsage = pytools.system.getCPU(1)
-                            time.sleep(1)
                             xw = xw + 1
                             
                             try:
@@ -932,6 +974,7 @@ class com:
                                 print(traceback.format_exc())
                             
                     except:
+                        print(traceback.format_exc())
                         time.sleep(15)
                 threadHttp = threading.Thread(target=com.start)
                 threadHttp.start()
@@ -966,6 +1009,15 @@ try:
             vm.flags.dontResetVban = True
         if flag == "--run":
             runf = True
+        if flag == "--helper":
+            flags.isHelper = True
+            audio.p.cpu_affinity([random.randint(0, psutil.cpu_count() - 1)])
+        if flag.split("=")[0] == "--soundAffinity":
+            flags.soundAffinity = flag.split("=")[1]
+        if flag.split("=")[0] == "--soundPriority":
+            flags.soundPriority = flag.split("=")[1]
+        if flag == "--oneWindow":
+            vm.configure.oneWindow = True
     if runf:
         com.run()
 except:

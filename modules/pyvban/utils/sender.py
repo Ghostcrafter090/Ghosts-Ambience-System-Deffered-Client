@@ -221,7 +221,7 @@ class VBAN_Sender:
         try:
             streamTime = time.monotonic()
             
-            self.arrayBuffer.append([self._stream.read(self._samples_per_frame), streamTime])
+            self.arrayBuffer.append([self._stream.read(self._samples_per_frame * 2), streamTime])
 
         except Exception as e:
             errorString = f"An exception occurred: {e}"
